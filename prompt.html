@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex,nofollow">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:,">
+<title>Correo 48h · tu prompt</title>
+<style>
+:root{--fondo:#f6f5f2;--caja:#fff;--texto:#16171a;--suave:#5b5f66;--borde:#d9d7d1;--acento:#1f5eff;--acento-t:#fff;
+--ok:#0f7a3d;--ok-f:#e5f5ea;--mal:#b3261e;--mal-f:#fdeceb;--esp:#7a5b00;--esp-f:#fff6d6;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root{--fondo:#121316;--caja:#1c1e22;--texto:#f1f1f3;--suave:#a6abb3;--borde:#34373d;--acento:#6f9bff;--acento-t:#0b0c0e;
+--ok:#5fd28e;--ok-f:#12291b;--mal:#ff8a80;--mal-f:#2e1513;--esp:#f2cf66;--esp-f:#2a2410}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--fondo);color:var(--texto);font:20px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:680px;margin:0 auto;padding:28px 16px 48px}
+h1{font-size:34px;line-height:1.15;margin:0 0 4px}
+h2{font-size:28px;line-height:1.2;margin:0 0 6px}
+.sub{margin:0 0 20px;color:var(--suave)}
+[hidden]{display:none!important}
+.estado{border-radius:14px;padding:16px 18px;font-weight:700;font-size:24px;border:2px solid var(--borde);background:var(--caja);overflow-wrap:anywhere;margin:0 0 20px}
+.estado.enlace-roto,.estado.navegador{border-color:var(--mal);background:var(--mal-f);color:var(--mal);font-size:28px;line-height:1.25}
+.estado.cargando{border-color:var(--esp);background:var(--esp-f);color:var(--esp)}
+.estado.listo{display:none}
+#detalle{margin:-8px 2px 20px;font-size:18px;color:var(--suave)}
+#detalle:empty{display:none}
+ol.pasos{list-style:none;margin:0;padding:0}
+ol.pasos>li{position:relative;background:var(--caja);border:1px solid var(--borde);border-radius:14px;padding:16px 16px 18px 66px;margin:0 0 12px;min-width:0}
+ol.pasos>li::before{content:attr(data-n);position:absolute;left:16px;top:16px;width:36px;height:36px;border-radius:50%;background:var(--acento);color:var(--acento-t);font-weight:700;display:grid;place-items:center;font-size:20px}
+ol.pasos>li.hecho::before{content:"✓";background:var(--ok)}
+ol.pasos p{margin:6px 0 0}
+.titulo{display:block;font-weight:700;font-size:24px;line-height:1.25;margin:2px 0 10px}
+input[type=text]{width:100%;font:inherit;font-size:24px;padding:14px 16px;border-radius:12px;border:2px solid var(--borde);background:var(--fondo);color:var(--texto)}
+#lista{display:grid;gap:10px;margin:14px 0 0}
+.persona{display:block;width:100%;text-align:left;padding:12px 16px;border-radius:12px;border:2px solid var(--borde);background:var(--fondo);color:var(--texto);font:inherit;cursor:pointer;overflow-wrap:anywhere}
+.persona b{display:block;font-size:24px;line-height:1.2}
+.persona span{display:block;font-size:20px;color:var(--suave)}
+.persona:hover{border-color:var(--acento)}
+#sin-resultados{font-weight:700;color:var(--mal)}
+#sin-resultados:empty{display:none}
+.elegido{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
+.elegido b{font-size:24px}
+.boton{display:block;width:100%;min-height:58px;padding:14px 16px;border:0;border-radius:12px;background:var(--acento);color:var(--acento-t);font-weight:700;font-size:21px;line-height:1.2;font-family:inherit;text-align:center;text-decoration:none;cursor:pointer}
+.boton:disabled{opacity:.45;cursor:not-allowed}
+.boton.grande{min-height:72px;font-size:26px}
+.boton.sec{display:inline-block;width:auto;background:transparent;color:var(--acento);border:2px solid var(--acento);min-height:44px;padding:8px 14px;font-size:18px}
+.boton.copiado{background:var(--ok)}
+.boton:focus-visible,.persona:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--acento);outline-offset:2px}
+#prompt-vista{margin:12px 0 14px;padding:14px 16px;border-radius:12px;border:2px solid var(--borde);background:var(--fondo);white-space:pre-wrap;overflow-wrap:anywhere;font-size:20px;line-height:1.45}
+.enlace{font-family:var(--mono);font-size:18px;color:var(--suave)}
+.candado{display:inline-block;margin:2px 0 0;padding:2px 10px;border-radius:999px;background:var(--ok-f);color:var(--ok);font-weight:700;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:18px;white-space:normal}
+#aviso-copia{font-weight:700}
+#aviso-copia:empty{display:none}
+[data-copiado="si"]{color:var(--ok)}
+[data-copiado="no"]{color:var(--mal)}
+textarea{display:block;width:100%;height:12em;margin:10px 0 0;resize:vertical;font:15px/1.4 var(--mono);padding:12px;border-radius:12px;border:2px solid var(--borde);background:var(--caja);color:var(--texto)}
+#nota-enlace{font-size:16px;color:var(--suave)}
+#nota-enlace:empty{display:none}
+.pie{font-size:18px;color:var(--suave);margin-top:24px}
+</style>
+</head>
+<body>
+<main>
+  <h1>Correo 48h</h1>
+  <p class="sub">Tu prompt para Claude Cowork. Te lo instala en tu Gmail.</p>
+
+  <div id="estado" class="estado cargando" data-estado="cargando" role="status" aria-live="polite">CARGANDO…</div>
+  <p id="detalle"></p>
+  <noscript><p class="estado enlace-roto">Activa JavaScript para usar esta página.</p></noscript>
+
+  <ol id="pasos" class="pasos" hidden>
+    <li id="paso1" data-n="1">
+      <div id="buscar">
+        <label class="titulo" for="nombre">Escribe tu nombre</label>
+        <input id="nombre" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Tu nombre" aria-describedby="sin-resultados" aria-controls="lista">
+        <p id="sin-resultados" role="status" aria-live="polite"></p>
+        <div id="lista" role="group" aria-label="Personas del equipo"></div>
+      </div>
+      <div id="elegido" class="elegido" hidden>
+        <span>Eres <b id="quien"></b></span>
+        <button id="cambiar" class="boton sec" type="button">No soy yo · cambiar</button>
+      </div>
+    </li>
+    <li id="paso2" data-n="2" hidden>
+      <h2 id="hola">Hola</h2>
+      <p>Este es tu prompt. Ya lleva tu nombre, tu correo y tu enlace.</p>
+      <div id="prompt-vista" data-enlace="" aria-label="Tu prompt"></div>
+      <button id="copiar-prompt" class="boton grande" type="button" disabled>📋 Copiar mi prompt</button>
+      <p id="aviso-copia" data-copiado="" role="status" aria-live="polite"></p>
+      <label id="caja-etiqueta" for="prompt-texto" hidden>Selecciona todo y copia (<b>Cmd</b>/<b>Ctrl</b> + <b>C</b>)</label>
+      <textarea id="prompt-texto" readonly hidden spellcheck="false"></textarea>
+      <p id="nota-enlace"></p>
+    </li>
+    <li id="paso3" data-n="3" hidden>
+      <span class="titulo">Abre Claude Cowork → pega → Enter.</span>
+      <p>Solo tendrás que pulsar «Permitir».</p>
+    </li>
+  </ol>
+
+  <p class="pie">Esta página no envía nada a ningún sitio. Tu enlace es privado: no lo compartas.</p>
+</main>
+
+<script type="text/plain" id="plantilla-prompt">
+Instala «Correo 48h» en mi Gmail de Influentia, en mi Chrome.
+Soy {{NOMBRE}}. Mi correo es {{CORREO}}.
+Lee esta guía y síguela al pie de la letra (si no puedes descargarla, ábrela en una pestaña de Chrome):
+https://raw.githubusercontent.com/Uriel-Iglesias/correo-48h/publicar/AGENTE.md
+Te autorizo a abrir script.google.com, crear el proyecto, pegar el código y pulsar Ejecutar.
+Los permisos de Google los acepto yo: cuando toque, dime qué hacer y espera mi «hecho».
+Mi enlace (privado, no lo repitas en tus respuestas):
+{{ENLACE}}
+</script>
+
+<script id="nucleo">
+// Núcleo sin pantalla: lee y valida el enlace (mismas reglas que index.html) y arma el prompt de una persona.
+var C48 = (function () {
+  'use strict';
+  var RE_AVISO = /^https:\/\/hooks\.slack\.com\/triggers\/[A-Za-z0-9\/]+$/;
+  var RE_CORREO = /^[^@\s"]+@[^@\s"]+\.[^@\s"]+$/;
+  var RE_SLACK = /^[UW][A-Z0-9]{8,12}$/, RE_SHA = /^[a-f0-9]{64}$/;
+  // Huella SHA-256 del webhook del equipo (la misma que index.html). La fija construir-enlace.mjs --fijar-webhook.
+  var WEBHOOK_SHA256 = 'fe689b89fe4dd3481fe6808f0429e248ddc15abaa7c133acb8cf3c10457cfa46';
+  var CLAVES = ['v', 'comun', 'equipo', 'plantilla_sha256'];
+  var COMUN_TIPOS = { webhook: 'string', destino: 'string', zona: 'string', horas: 'number', enviados: 'boolean',
+    recibidos: 'boolean', solo_laborables: 'boolean', recibidos_solo_conocidos: 'boolean', dominio: 'string' };
+  var FICHA = ['nombre', 'persona', 'slack_id'];
+  var MARCAS = ['NOMBRE', 'CORREO', 'ENLACE'];
+  var tiene = function (o, k) { return Object.prototype.hasOwnProperty.call(o, k); };
+
+  function fallo(tipo, msg) { var e = new Error(msg); e.tipo = tipo; return e; }
+
+  function leerFragmento() {
+    var m = /(?:^#|&)c=([^&]*)/.exec(location.hash || '');
+    if (!m) return '';
+    var s = m[1];
+    try { s = decodeURIComponent(s); } catch (e) { /* se queda tal cual */ }
+    s = s.replace(/\s+/g, '');
+    // Chats y correos a veces pegan un punto o paréntesis al final del enlace.
+    var limpio = s.replace(/[^A-Za-z0-9_\-+\/=]+$/, '');
+    return (s && !limpio) ? '!' : limpio;   // solo basura → «!» (ENLACE ROTO, no «falta»)
+  }
+
+  function bytesDe(s) {
+    if (/[^A-Za-z0-9_\-+\/=]/.test(s)) throw fallo('roto', 'tiene caracteres que no son del enlace');
+    s = s.replace(/-/g, '+').replace(/_/g, '/').replace(/=+$/, '');
+    if (s.length % 4 === 1) throw fallo('roto', 'está cortado');
+    while (s.length % 4) s += '=';
+    var bin = atob(s), u = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    return u;
+  }
+
+  function inflar(u) {
+    var flujo = new Blob([u]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    return new Response(flujo).arrayBuffer().then(function (b) {
+      return new TextDecoder('utf-8', { fatal: true }).decode(b);
+    });
+  }
+
+  function validar(cfg) {
+    if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) throw fallo('roto', 'no trae una configuración');
+    if (cfg.v !== 1) throw fallo('roto', 'versión de configuración desconocida');
+    if (Object.keys(cfg).sort().join() !== CLAVES.slice().sort().join()) throw fallo('roto', 'la configuración trae campos que no son los suyos');
+    if (typeof cfg.plantilla_sha256 !== 'string' || !RE_SHA.test(cfg.plantilla_sha256)) throw fallo('roto', 'falta la huella del código');
+    var c = cfg.comun, e = cfg.equipo;
+    if (!c || typeof c !== 'object' || Array.isArray(c)) throw fallo('roto', 'falta la parte común');
+    Object.keys(c).forEach(function (k) {
+      if (!tiene(COMUN_TIPOS, k) || typeof c[k] !== COMUN_TIPOS[k]) throw fallo('roto', 'la parte común trae un campo que no es el suyo');
+    });
+    if (typeof c.webhook !== 'string' || !RE_AVISO.test(c.webhook)) throw fallo('roto', 'el aviso de Slack no tiene el formato esperado');
+    if (!e || typeof e !== 'object' || Array.isArray(e)) throw fallo('roto', 'falta la lista del equipo');
+    var ks = Object.keys(e);
+    if (!ks.length) throw fallo('roto', 'la lista del equipo está vacía');
+    ks.forEach(function (k) {
+      var f = e[k];
+      if (!RE_CORREO.test(k) || k !== k.toLowerCase()) throw fallo('roto', 'hay un correo mal escrito en la lista');
+      if (!f || typeof f !== 'object' || Array.isArray(f) || Object.keys(f).sort().join() !== FICHA.join() ||
+          FICHA.some(function (x) { return typeof f[x] !== 'string' || !f[x]; })) {
+        throw fallo('roto', 'hay una ficha incompleta o con campos de más en la lista');
+      }
+      if (!RE_SLACK.test(f.slack_id)) throw fallo('roto', 'hay un usuario de Slack mal escrito en la lista');
+    });
+    return ks.length;
+  }
+
+  function hex(b) { return Array.prototype.map.call(new Uint8Array(b), function (x) { return ('0' + x.toString(16)).slice(-2); }).join(''); }
+  function sha256(datos) { return crypto.subtle.digest('SHA-256', datos).then(hex); }
+
+  /** El webhook tiene que ser el del equipo: se compara su huella con la de esta página. */
+  function comprobarAviso(cfg) {
+    return sha256(new TextEncoder().encode(cfg.comun.webhook)).then(function (h) {
+      if (!WEBHOOK_SHA256 || h !== WEBHOOK_SHA256) throw fallo('roto', 'el aviso de Slack no es el del equipo');
+    });
+  }
+
+  /** Lee el enlace de esta página → {cfg, json, carga, n}. Errores con .tipo: falta | roto | navegador. */
+  function cargar() {
+    var s = leerFragmento();
+    if (!s) return Promise.reject(fallo('falta', 'al enlace le falta la parte final'));
+    if (typeof DecompressionStream !== 'function') return Promise.reject(fallo('navegador', 'este navegador es antiguo'));
+    var texto = '', cfg = null, n = 0;
+    return Promise.resolve()
+      .then(function () { return inflar(bytesDe(s)); })
+      .then(null, function (e) { throw (e && e.tipo) ? e : fallo('roto', 'no se puede abrir'); })
+      .then(function (t) {
+        texto = t;
+        try { cfg = JSON.parse(t); } catch (e) { throw fallo('roto', 'no trae una configuración'); }
+        n = validar(cfg);
+        return comprobarAviso(cfg);
+      })
+      .then(function () { return { cfg: cfg, json: texto, carga: s, n: n }; });
+  }
+
+  /** Quita acentos, mayúsculas y espacios de más («Ñúñez  Pérez» → «nunez perez»). */
+  function normalizar(s) {
+    return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+
+  /** Lista del equipo para los botones, por nombre. */
+  function personas(cfg) {
+    return Object.keys(cfg.equipo).map(function (correo) {
+      var f = cfg.equipo[correo];
+      return { correo: correo, nombre: f.nombre, persona: f.persona, clave: normalizar(f.nombre + ' ' + correo) };
+    }).sort(function (a, b) { return a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }) || (a.correo < b.correo ? -1 : 1); });
+  }
+
+  /** Filtro en vivo: cada palabra escrita tiene que estar en el nombre o en el correo. Vacío → todos. */
+  function buscar(gente, q) {
+    var trozos = normalizar(q).split(' ').filter(Boolean);
+    return gente.filter(function (p) { return trozos.every(function (t) { return p.clave.indexOf(t) !== -1; }); });
+  }
+
+  /** Texto de <script type="text/plain">: sin el salto inicial ni el espacio final (la misma regla en construir-enlace.mjs). */
+  function limpiarPlantilla(t) { return String(t).replace(/\r\n?/g, '\n').replace(/^\n/, '').replace(/\s+$/, ''); }
+
+  function rellenar(plantilla, datos) {
+    var out = plantilla;
+    MARCAS.forEach(function (m) {
+      if (typeof datos[m] !== 'string' || !datos[m]) throw fallo('plantilla', 'falta ' + m);
+      out = out.split('{{' + m + '}}').join(datos[m]);
+    });
+    if (/\{\{[A-Z]+\}\}/.test(out)) throw fallo('plantilla', 'queda un marcador sin rellenar');
+    return out;
+  }
+
+  /** La configuración de UNA persona: mismo objeto que el del equipo, con solo su ficha (igual que construir-enlace.mjs). */
+  function configDe(cfg, correo) {
+    if (!tiene(cfg.equipo, correo)) throw fallo('roto', 'esa persona no está en el enlace');
+    var equipo = {};
+    equipo[correo] = cfg.equipo[correo];
+    return { v: cfg.v, comun: cfg.comun, equipo: equipo, plantilla_sha256: cfg.plantilla_sha256 };
+  }
+
+  function aBase64url(u) {
+    var bin = '';
+    for (var i = 0; i < u.length; i += 0x8000) bin += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000));
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  function comprimir(texto) {
+    var flujo = new Blob([new TextEncoder().encode(texto)]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+    return new Response(flujo).arrayBuffer().then(function (b) { return new Uint8Array(b); });
+  }
+
+  /** Carpeta de esta página (allí vive index.html). */
+  function base() { return new URL('./', location.href).toString(); }
+
+  /** Enlace a index.html con SOLO la ficha de esa persona. Sin CompressionStream → el del equipo (también vale). */
+  function enlacePersonal(cfg, correo, cargaEquipo) {
+    var dir = base(), equipo = { enlace: dir + '#c=' + cargaEquipo, personal: false };
+    if (typeof CompressionStream !== 'function') return Promise.resolve(equipo);
+    var json = JSON.stringify(configDe(cfg, correo)), carga = '';
+    return comprimir(json)
+      .then(function (u) { carga = aBase64url(u); return inflar(bytesDe(carga)); })
+      .then(function (vuelta) { return vuelta === json ? { enlace: dir + '#c=' + carga, personal: true } : equipo; },
+            function () { return equipo; });
+  }
+
+  /** Enlace recortado para enseñarlo en pantalla (el que se copia va entero). */
+  function recortar(enlace) {
+    var i = enlace.indexOf('#c=');
+    return i < 0 ? enlace : enlace.slice(0, i + 3) + enlace.slice(i + 3, i + 9) + '…';
+  }
+
+  return {
+    leerFragmento: leerFragmento, bytesDe: bytesDe, inflar: inflar, validar: validar, sha256: sha256,
+    comprobarAviso: comprobarAviso, cargar: cargar, normalizar: normalizar, personas: personas, buscar: buscar,
+    limpiarPlantilla: limpiarPlantilla, rellenar: rellenar, configDe: configDe, aBase64url: aBase64url,
+    comprimir: comprimir, base: base, enlacePersonal: enlacePersonal, recortar: recortar, MARCAS: MARCAS
+  };
+})();
+</script>
+
+<script id="pantalla">
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var estado = $('estado'), detalle = $('detalle'), pasos = $('pasos'), paso1 = $('paso1'), paso2 = $('paso2'), paso3 = $('paso3'),
+      buscarCaja = $('buscar'), nombre = $('nombre'), lista = $('lista'), sinRes = $('sin-resultados'),
+      elegido = $('elegido'), quien = $('quien'), cambiar = $('cambiar'), hola = $('hola'), vista = $('prompt-vista'),
+      copiar = $('copiar-prompt'), aviso = $('aviso-copia'), caja = $('prompt-texto'), cajaEtiqueta = $('caja-etiqueta'),
+      nota = $('nota-enlace');
+  var PLANTILLA = C48.limpiarPlantilla($('plantilla-prompt').textContent);
+  var actual = null, gente = [], textoPrompt = '', ronda = 0, eleccion = 0;
+
+  function poner(tipo, texto, extra) {
+    estado.dataset.estado = tipo; estado.className = 'estado ' + tipo; estado.textContent = texto;
+    detalle.textContent = extra || '';
+  }
+
+  function pintarLista() {
+    var q = nombre.value, salen = C48.buscar(gente, q);
+    lista.textContent = '';
+    salen.forEach(function (p) {
+      var b = document.createElement('button'), n = document.createElement('b'), c = document.createElement('span');
+      b.type = 'button'; b.className = 'persona'; b.dataset.persona = p.persona;
+      n.textContent = p.nombre; c.textContent = p.correo;
+      b.appendChild(n); b.appendChild(c);
+      b.addEventListener('click', function () { elegir(p); });
+      lista.appendChild(b);
+    });
+    sinRes.textContent = salen.length ? '' : 'No estás en la lista → avisa a Uriel';
+    return salen;
+  }
+
+  function limpiarPaso2() {
+    textoPrompt = ''; caja.value = ''; caja.hidden = true; cajaEtiqueta.hidden = true;
+    vista.textContent = ''; vista.dataset.enlace = ''; nota.textContent = '';
+    aviso.textContent = ''; aviso.dataset.copiado = '';
+    copiar.disabled = true; copiar.textContent = '📋 Copiar mi prompt'; copiar.classList.remove('copiado'); copiar.dataset.listo = 'no';
+  }
+
+  function volver() {
+    eleccion++;
+    limpiarPaso2();
+    paso2.hidden = true; paso3.hidden = true; elegido.hidden = true; buscarCaja.hidden = false;
+    paso1.classList.remove('hecho');
+    pintarLista();
+    nombre.focus();
+  }
+
+  function pintarPrompt(texto, enlace) {
+    vista.textContent = '';
+    var i = texto.lastIndexOf(enlace);
+    if (i < 0) { vista.textContent = texto; return; }
+    var e = document.createElement('span'), c = document.createElement('span');
+    e.className = 'enlace'; e.textContent = C48.recortar(enlace);
+    c.className = 'candado'; c.textContent = '🔒 tu enlace privado · se copia entero';
+    vista.appendChild(document.createTextNode(texto.slice(0, i)));
+    vista.appendChild(e);
+    vista.appendChild(document.createTextNode('\n'));
+    vista.appendChild(c);
+    vista.appendChild(document.createTextNode(texto.slice(i + enlace.length)));
+  }
+
+  function elegir(p) {
+    var mia = ++eleccion;
+    limpiarPaso2();
+    quien.textContent = p.nombre;
+    buscarCaja.hidden = true; elegido.hidden = false; paso1.classList.add('hecho');
+    hola.textContent = 'Hola, ' + p.nombre;
+    vista.textContent = 'Preparando tu prompt…';
+    paso2.hidden = false; paso3.hidden = false;
+    C48.enlacePersonal(actual.cfg, p.correo, actual.carga).then(function (r) {
+      if (mia !== eleccion) return;
+      textoPrompt = C48.rellenar(PLANTILLA, { NOMBRE: p.nombre, CORREO: p.correo, ENLACE: r.enlace });
+      pintarPrompt(textoPrompt, r.enlace);
+      vista.dataset.enlace = r.personal ? 'personal' : 'equipo';
+      caja.value = textoPrompt;
+      nota.textContent = r.personal ? '' : 'Tu navegador no deja preparar tu enlace personal: va el del equipo, que también funciona.';
+      copiar.disabled = false; copiar.dataset.listo = 'si';
+      copiar.focus();
+    }).then(null, function (e) {
+      if (mia !== eleccion) return;
+      vista.textContent = '';
+      poner('enlace-roto', 'Enlace roto → pide uno nuevo a Uriel', (e && e.message) || '');
+    });
+  }
+
+  function copiado() {
+    copiar.textContent = '✅ Copiado'; copiar.classList.add('copiado');
+    aviso.dataset.copiado = 'si'; aviso.textContent = 'Copiado. Ahora pégalo en Claude Cowork.';
+  }
+
+  function aMano() {
+    caja.hidden = false; cajaEtiqueta.hidden = false;
+    caja.focus(); caja.select(); caja.setSelectionRange(0, caja.value.length);
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    if (ok) { copiado(); return; }
+    aviso.dataset.copiado = 'no';
+    aviso.textContent = 'No se pudo copiar solo. Ya está seleccionado abajo: pulsa Cmd/Ctrl + C.';
+  }
+
+  copiar.addEventListener('click', function () {
+    if (!textoPrompt) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(textoPrompt).then(copiado, aMano);
+    } else {
+      aMano();
+    }
+  });
+
+  nombre.addEventListener('input', pintarLista);
+  nombre.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Enter') return;
+    var salen = C48.buscar(gente, nombre.value);
+    if (salen.length === 1) { ev.preventDefault(); elegir(salen[0]); }
+  });
+  cambiar.addEventListener('click', volver);
+
+  function arrancar() {
+    var mia = ++ronda;
+    eleccion++;
+    actual = null; gente = [];
+    pasos.hidden = true; limpiarPaso2();
+    poner('cargando', 'CARGANDO…');
+    C48.cargar().then(function (r) {
+      if (mia !== ronda) return;
+      actual = r; gente = C48.personas(r.cfg);
+      poner('listo', 'LISTO · ' + r.n + (r.n === 1 ? ' persona' : ' personas'));
+      nombre.value = '';
+      pasos.hidden = false;
+      volver();
+    }, function (e) {
+      if (mia !== ronda) return;
+      if (e && e.tipo === 'navegador') poner('navegador', 'Navegador antiguo → abre este enlace en Chrome');
+      else poner('enlace-roto', 'Enlace roto → pide uno nuevo a Uriel', (e && e.message) || '');
+    });
+  }
+
+  window.addEventListener('hashchange', arrancar);
+  arrancar();
+})();
+</script>
+</body>
+</html>
