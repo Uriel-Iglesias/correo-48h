@@ -1,7 +1,7 @@
-// ▷ EJECUTAR: da igual qué función salga en el desplegable. Al pulsar ▷ Ejecutar se instala solo.
+// ▷ EJECUTAR: en el desplegable de arriba debe poner myFunction (si no, elígelo) y pulsa ▷ Ejecutar.
 // Mira el «Registro de ejecución»: ✅ INSTALADO · ✅ YA ESTABA INSTALADO · ❌ NO INSTALADO (en rojo).
 function myFunction() {
-  return _instalarForzado();
+  return instalarForzado_();
 }
 
 /**
@@ -27,12 +27,16 @@ function myFunction() {
  *   · con los activadores justos → no toca nada y escribe «✅ YA ESTABA INSTALADO para <nombre> · activadores: …».
  *     Es lo que pasa en cada ejecución por activador: ni reinstala ni lanza error;
  *   · con activadores que faltan o sobran → los deja limpios y lo dice («· reparado (había: …)»);
- *   · cuenta fuera de la lista o configuración vacía → Error en rojo «❌ NO INSTALADO · <motivo> · cuenta: <correo>».
+ *   · cuenta fuera de la lista, configuración vacía o permisos a medias (no se marcó «Seleccionar todo») → Error en rojo
+ *     «❌ NO INSTALADO · <motivo> · cuenta: <correo>».
  *     Si ya había activadores no lanza (rompería las ejecuciones por activador): lo escribe con «⚠️» y no toca nada;
  *   · después de desinstalar() (propiedad de usuario «correo48h_desinstalado» = «1») → no reinstala y escribe
  *     «⏸ DESINSTALADO a propósito …». myFunction quita la marca y vuelve a instalar.
  *
- * Funciones del desplegable:
+ *   · si en ESTA ejecución acaba de instalar, probar · desinstalar · desinstalarTodo · procesar no hacen nada
+ *     (por si el desplegable no estaba en myFunction): lo dicen con «↪ … no se ejecuta».
+ *
+ * Funciones del desplegable (las internas acaban en «_» y no salen):
  *   myFunction      · instala o reinstala limpio (quita la marca de desinstalado). Es la que sale por defecto.
  *   comprobar       · SOLO LECTURA: lista activadores, etiquetas y marca. Ojo: el arranque corre antes que ella;
  *                     si no estaba instalado, la línea de arriba dirá que lo acaba de instalar.
@@ -56,23 +60,23 @@ var POR_DEFECTO = { destino: 'mensaje directo de Slack', zona: 'Europe/Madrid', 
   recibidos: false, solo_laborables: false, recibidos_solo_conocidos: true };
 var ORDEN_ACTIVADORES = ['autoetiquetar', 'procesar'];
 
-function _tieneClaves(o) {
+function tieneClaves_(o) {
   if (!o || typeof o !== 'object') return false;
   for (var k in o) { if (Object.prototype.hasOwnProperty.call(o, k)) return true; }
   return false;
 }
 /** Ficha de la persona en EQUIPO (sin distinguir mayúsculas). null = no está en la lista. */
-function _fichaDe(correo) {
+function fichaDe_(correo) {
   var e = String(correo || '').toLowerCase();
-  if (!e || !_tieneClaves(EQUIPO)) return null;
+  if (!e || !tieneClaves_(EQUIPO)) return null;
   for (var k in EQUIPO) {
     if (Object.prototype.hasOwnProperty.call(EQUIPO, k) && String(k).toLowerCase() === e) return EQUIPO[k] || null;
   }
   return null;
 }
 /** CONFIG de la cuenta que ejecuta = valores por defecto + COMUN + su ficha. null = no está en la lista. */
-function _configWeb() {
-  var e = _cuentaActual(), f = _fichaDe(e), k;
+function configWeb_() {
+  var e = cuentaActual_(), f = fichaDe_(e), k;
   if (!f || typeof f !== 'object') return null;
   var c = {};
   for (k in POR_DEFECTO) c[k] = POR_DEFECTO[k];
@@ -85,7 +89,7 @@ function _configWeb() {
   c.horas = Number(c.horas) > 0 ? Number(c.horas) : POR_DEFECTO.horas;
   return c;
 }
-var CONFIG = _configWeb() || { persona: '__FUERA__', nombre: '__FUERA__', correo: '__FUERA__', slack_id: '__FUERA__',
+var CONFIG = configWeb_() || { persona: '__FUERA__', nombre: '__FUERA__', correo: '__FUERA__', slack_id: '__FUERA__',
   webhook: '', destino: POR_DEFECTO.destino, horas: POR_DEFECTO.horas, enviados: false, recibidos: false,
   solo_laborables: false, recibidos_solo_conocidos: true, dominio: '__FUERA__', zona: POR_DEFECTO.zona };
 
@@ -108,72 +112,73 @@ var BUSQUEDA_RECIBIDOS = 'in:inbox newer_than:10d -in:chats -in:drafts -label:' 
   ' -category:promotions -category:social -category:updates -category:forums';
 var ROBOTS = /(noreply|no-reply|no_reply|notification|notifications|notificaciones|mailer-daemon|postmaster|newsletter|donotreply|do-not-reply|bounce|calendar-notification|@resource\.calendar\.google\.com)/;
 
-function _ahora() { return Date.now(); }
+function ahora_() { return Date.now(); }
 
 // ── Instalación ─────────────────────────────────────────────────────────────
-function instalar() { return _instalar('real'); }
-function instalarEnsayo() { return _instalar('ensayo'); }
+function instalar() { return instalar_('real'); }
+function instalarEnsayo() { return instalar_('ensayo'); }
 function pasarAReal() {
-  if (!_configOk(true)) return false;
+  if (!configOk_(true)) return false;
   PropertiesService.getUserProperties().setProperty(CLAVE_MODO, 'real');
   Logger.log('Modo REAL: a partir de ahora los avisos llegan a Slack (' + CONFIG.destino + ').');
   return true;
 }
-function _instalar(modo, nota) { return !!_instalarDetalle(modo, nota, false); }
+function instalar_(modo, nota) { return !!instalarDetalle_(modo, nota, false); }
 /**
  * Instalación limpia bajo candado: quita TODOS los activadores del proyecto, quita la marca de desinstalado
  * y crea los justos. soloSiFalta = true (arranque): si al coger el candado ya están completos, no toca nada.
  * Devuelve 'instalado' | 'ya' | '' (no se puede instalar en esta cuenta).
  */
-function _instalarDetalle(modo, nota, soloSiFalta) {
-  if (!_configOk(true)) return '';
-  return _conCandado(function () {
+function instalarDetalle_(modo, nota, soloSiFalta) {
+  if (!configOk_(true)) return '';
+  return conCandado_(function () {
     if (soloSiFalta) {
-      var est = _estadoActivadores();
+      var est = estadoActivadores_();
       if (est.completo) {
         Logger.log('✅ YA ESTABA INSTALADO para ' + CONFIG.nombre + ' · activadores: ' + est.lista);
         return 'ya';
       }
     }
-    _quitarActivadores();
+    quitarActivadores_();
     var props = PropertiesService.getUserProperties();
-    var ahora = _ahora();
+    var ahora = ahora_();
     props.deleteProperty(CLAVE_DESINSTALADO);
     props.setProperty(CLAVE_MODO, modo);
-    _etiqueta(ETIQUETA_NO);                     // a mano para la persona desde el primer día
+    etiqueta_(ETIQUETA_NO);                     // a mano para la persona desde el primer día
     if (CONFIG.enviados) {
-      _etiqueta(ETIQUETA_SEGUIR); _etiqueta(ETIQUETA_AVISADO);
+      etiqueta_(ETIQUETA_SEGUIR); etiqueta_(ETIQUETA_AVISADO);
       var previo = Number(props.getProperty(CLAVE_ULTIMO_AUTO) || 0);
       if (!previo || ahora - previo > 24 * 3600000) props.setProperty(CLAVE_ULTIMO_AUTO, String(ahora));
       ScriptApp.newTrigger('autoetiquetar').timeBased().everyMinutes(10).create();
     }
     if (CONFIG.recibidos) {
-      _etiqueta(ETIQUETA_POR_CONTESTAR);
+      etiqueta_(ETIQUETA_POR_CONTESTAR);
       if (!props.getProperty(CLAVE_INICIO_RECIBIDOS)) props.setProperty(CLAVE_INICIO_RECIBIDOS, String(ahora));
     }
     if (CONFIG.enviados || CONFIG.recibidos) ScriptApp.newTrigger('procesar').timeBased().everyHours(1).create();
     Logger.log('Configuración · ' + CONFIG.nombre + ' <' + CONFIG.correo + '> · modo ' + String(modo).toUpperCase() +
       ' · enviados ' + (CONFIG.enviados ? 'SÍ' : 'NO') + ' · recibidos ' + (CONFIG.recibidos ? 'SÍ' : 'NO') +
       ' · umbral ' + CONFIG.horas + ' h' + (CONFIG.solo_laborables ? ' laborables' : '') + ' · Slack: ' + CONFIG.destino);
-    Logger.log('✅ INSTALADO para ' + CONFIG.nombre + ' · activadores: ' + _estadoActivadores().lista + (nota ? ' · ' + nota : ''));
+    Logger.log('✅ INSTALADO para ' + CONFIG.nombre + ' · activadores: ' + estadoActivadores_().lista + (nota ? ' · ' + nota : ''));
     return 'instalado';
   });
 }
 /** myFunction: instalación limpia forzada (quita la marca de desinstalado). */
-function _instalarForzado() {
-  var motivo = _motivoNoInstalable();
-  if (motivo) _noInstalado(motivo);
+function instalarForzado_() {
+  var motivo = motivoNoInstalable_();
+  if (motivo) noInstalado_(motivo);
+  if (faltanPermisos_()) noInstalado_(MOTIVO_PERMISOS);
   if (typeof ARRANQUE !== 'undefined' && ARRANQUE && ARRANQUE.accion === 'instalado') {
     Logger.log('myFunction · ya quedó instalado hace un instante, en esta misma ejecución: no hace falta repetir.');
     return true;
   }
   var r = '';
-  try { r = _instalarDetalle('real', 'reinstalación limpia (myFunction)', false); }
-  catch (e) { _noInstalado('fallo al crear los activadores (' + ((e && e.message) || e) + ')'); }
-  if (!r) _noInstalado('no se pudo instalar');
+  try { r = instalarDetalle_('real', 'reinstalación limpia (myFunction)', false); }
+  catch (e) { noInstalado_('fallo al crear los activadores (' + ((e && e.message) || e) + ')'); }
+  if (!r) noInstalado_('no se pudo instalar');
   return true;
 }
-function _conCandado(fn) {
+function conCandado_(fn) {
   var candado = null;
   try {
     candado = LockService.getUserLock();
@@ -181,20 +186,22 @@ function _conCandado(fn) {
   } catch (e) { candado = null; }
   try { return fn(); } finally { if (candado) { try { candado.releaseLock(); } catch (e2) {} } }
 }
-function _quitarActivadores() {
+function quitarActivadores_() {
   var n = 0;
   ScriptApp.getProjectTriggers().forEach(function (t) { ScriptApp.deleteTrigger(t); n++; });
   return n;
 }
 function desinstalar() {
-  var n = _quitarActivadores();
+  if (recienInstalado_('desinstalar')) return 0;
+  var n = quitarActivadores_();
   PropertiesService.getUserProperties().setProperty(CLAVE_DESINSTALADO, '1');
   Logger.log('⏹ DESINSTALADO · activadores eliminados: ' + n + ' · ya no se reinstala solo al ejecutar. ' +
     'Para volver a activarlo: elige myFunction y pulsa ▷ Ejecutar.');
   return n;
 }
 function desinstalarTodo() {
-  var n = _quitarActivadores();
+  if (recienInstalado_('desinstalarTodo')) return 0;
+  var n = quitarActivadores_();
   var props = PropertiesService.getUserProperties();
   props.deleteAllProperties();
   props.setProperty(CLAVE_DESINSTALADO, '1');
@@ -202,24 +209,38 @@ function desinstalarTodo() {
     'se pueden borrar a mano. Para volver a activarlo: elige myFunction y pulsa ▷ Ejecutar.');
   return n;
 }
-function _marcadoDesinstalado() {
+function marcadoDesinstalado_() {
   return PropertiesService.getUserProperties().getProperty(CLAVE_DESINSTALADO) === '1';
 }
-function _noInstalado(motivo) {
-  var texto = '❌ NO INSTALADO · ' + motivo + ' · cuenta: ' + (_cuentaActual() || 'desconocida');
+function noInstalado_(motivo) {
+  var texto = '❌ NO INSTALADO · ' + motivo + ' · cuenta: ' + (cuentaActual_() || 'desconocida');
   Logger.log(texto);
   throw new Error(texto);
 }
-function _activadoresEsperados() {
+var MOTIVO_PERMISOS = 'faltan permisos de Google (se aceptaron a medias): pulsa ▷ Ejecutar otra vez, marca «Seleccionar todo» y pulsa Permitir';
+/** true = Google no tiene todos los permisos del script (consentimiento parcial) · false = todos · null = no se pudo saber. */
+function faltanPermisos_() {
+  try {
+    var info = ScriptApp.getAuthorizationInfo(ScriptApp.AuthMode.FULL);
+    return info.getAuthorizationStatus() === ScriptApp.AuthorizationStatus.REQUIRED;
+  } catch (e) { return null; }
+}
+/** Si esta misma ejecución acaba de instalar, la función elegida no era myFunction: no se hace nada más. */
+function recienInstalado_(funcion) {
+  if (typeof ARRANQUE === 'undefined' || !ARRANQUE || ARRANQUE.accion !== 'instalado') return false;
+  Logger.log('↪ ' + funcion + ' no se ejecuta: el arranque acaba de instalarlo en esta misma ejecución. No hace falta nada más.');
+  return true;
+}
+function activadoresEsperados_() {
   var out = [];
   if (CONFIG.enviados) out.push('autoetiquetar');
   if (CONFIG.enviados || CONFIG.recibidos) out.push('procesar');
   return out;
 }
 /** Activadores del proyecto frente a los esperados (exactamente uno de cada, ninguno más). */
-function _estadoActivadores() {
+function estadoActivadores_() {
   var nombres = ScriptApp.getProjectTriggers().map(function (t) { return String(t.getHandlerFunction()); });
-  var esperados = _activadoresEsperados();
+  var esperados = activadoresEsperados_();
   var cuenta = {};
   nombres.forEach(function (n) { cuenta[n] = (cuenta[n] || 0) + 1; });
   var completo = esperados.length > 0 && nombres.length === esperados.length &&
@@ -235,8 +256,8 @@ function _estadoActivadores() {
 function verificar() {
   var fallos = [];
   var ok = function (c, texto) { Logger.log((c ? 'OK    · ' : 'FALLO · ') + texto); if (!c) fallos.push(texto); };
-  ok(_configRellena(), 'Configuración rellena (sin «__»)');
-  ok(_identidadOk(), 'El script corre en la cuenta de ' + CONFIG.correo + ' (cuenta actual: ' + _cuentaActual() + ')');
+  ok(configRellena_(), 'Configuración rellena (sin «__»)');
+  ok(identidadOk_(), 'El script corre en la cuenta de ' + CONFIG.correo + ' (cuenta actual: ' + cuentaActual_() + ')');
   ok(RE_WEBHOOK.test(String(CONFIG.webhook || '')), 'Webhook de Slack con el formato esperado');
   var nombres = ScriptApp.getProjectTriggers().map(function (t) { return t.getHandlerFunction(); });
   ok(!CONFIG.enviados || nombres.indexOf('autoetiquetar') !== -1, 'Activador autoetiquetar (cada 10 min)' + (CONFIG.enviados ? '' : ' — no aplica'));
@@ -244,161 +265,169 @@ function verificar() {
   ok(nombres.length === (CONFIG.enviados ? 2 : 1), 'Número de activadores: ' + nombres.length + ' (sin duplicados)');
   ok(!!GmailApp.getUserLabelByName(ETIQUETA_NO), 'Etiqueta «' + ETIQUETA_NO + '» creada');
   if (CONFIG.enviados) ok(!!GmailApp.getUserLabelByName(ETIQUETA_SEGUIR), 'Etiqueta «' + ETIQUETA_SEGUIR + '» creada');
-  Logger.log('Modo: ' + _modo().toUpperCase() + ' · Pausa: ' + (_enPausa() ? 'SÍ (existe «' + ETIQUETA_PAUSA + '»)' : 'no'));
+  Logger.log('Modo: ' + modo_().toUpperCase() + ' · Pausa: ' + (enPausa_() ? 'SÍ (existe «' + ETIQUETA_PAUSA + '»)' : 'no'));
   Logger.log(fallos.length ? '=== ' + fallos.length + ' FALLO(S) ===' : '=== VERIFICACIÓN CORRECTA ===');
   return fallos;
 }
 /** SOLO LECTURA: no crea, no borra, no cambia nada (ni activadores, ni etiquetas, ni memoria). */
 function comprobar() {
-  var cuenta = _cuentaActual() || 'desconocida';
-  var motivo = _motivoNoInstalable();
+  var cuenta = cuentaActual_() || 'desconocida';
+  var motivo = motivoNoInstalable_();
   var activadores = ScriptApp.getProjectTriggers().map(function (t) {
     var tipo = '';
     try { tipo = String(t.getEventType()); } catch (e) {}
     return String(t.getHandlerFunction()) + (tipo ? ' (' + tipo + ')' : '');
   });
-  var est = _estadoActivadores();
+  var est = estadoActivadores_();
   var etiquetas = [ETIQUETA_SEGUIR, ETIQUETA_AVISADO, ETIQUETA_NO, ETIQUETA_POR_CONTESTAR, ETIQUETA_PAUSA].map(function (n) {
     return n + (GmailApp.getUserLabelByName(n) ? ' ✔' : ' ✘');
   });
-  var marca = _marcadoDesinstalado();
+  var marca = marcadoDesinstalado_();
   var estado = motivo ? 'NO INSTALABLE EN ESTA CUENTA' : est.completo ? 'INSTALADO Y COMPLETO' :
     est.total ? 'ACTIVADORES QUE NO CUADRAN (ejecuta myFunction)' : marca ? 'DESINSTALADO A PROPÓSITO' : 'NO INSTALADO';
   Logger.log('=== COMPROBAR (solo lectura: no cambia nada) · cuenta: ' + cuenta + ' ===');
   Logger.log('En la lista del equipo: ' + (motivo ? 'NO · ' + motivo : 'SÍ · ' + CONFIG.nombre));
   Logger.log('Activadores (' + activadores.length + '): ' + (activadores.join(' | ') || 'ninguno') +
-    ' · esperados: ' + (_activadoresEsperados().join(', ') || 'ninguno'));
+    ' · esperados: ' + (activadoresEsperados_().join(', ') || 'ninguno'));
   Logger.log('Etiquetas: ' + etiquetas.join(' · ') + ' («' + ETIQUETA_PAUSA + '» ✘ = no está en pausa)');
-  Logger.log('Marca de desinstalado: ' + (marca ? 'SÍ' : 'no') + ' · Modo: ' + _modo().toUpperCase());
+  Logger.log('Marca de desinstalado: ' + (marca ? 'SÍ' : 'no') + ' · Modo: ' + modo_().toUpperCase());
   Logger.log('=== RESULTADO: ' + estado + ' ===');
   return { estado: estado, cuenta: cuenta, activadores: activadores, etiquetas: etiquetas, desinstalado: marca };
 }
 /** Manda UN mensaje de prueba al Slack de la persona. Solo a mano: nada lo llama solo. */
 function probar() {
-  if (!_configOk(true)) return false;
+  if (recienInstalado_('probar')) return false;
+  if (!configOk_(true)) return false;
   var carga = { account: CONFIG.slack_id, asunto: 'Prueba de Correo 48h', remitente: 'Correo 48h', horas: 0,
-    fecha: Utilities.formatDate(new Date(_ahora()), CONFIG.zona, 'dd/MM HH:mm'),
+    fecha: Utilities.formatDate(new Date(ahora_()), CONFIG.zona, 'dd/MM HH:mm'),
     enlace: 'https://mail.google.com/mail/u/0/#inbox',
     texto: '🧪 Prueba de Correo 48h: si ves este mensaje, los avisos te llegarán aquí. No hay que hacer nada.' };
-  var ok = _enviar(CONFIG.webhook, carga);
+  var ok = enviar_(CONFIG.webhook, carga);
   Logger.log(ok ? '✅ PRUEBA ENVIADA: mira tu Slack (mensaje directo).' : '❌ La prueba no llegó a Slack: mira la línea de arriba.');
   return ok;
 }
 
 // ── Identidad y configuración ──────────────────────────────────────────────
-function _configRellena() {
+function configRellena_() {
   return ['persona', 'nombre', 'correo', 'slack_id', 'webhook'].every(function (k) {
     return CONFIG[k] && String(CONFIG[k]).indexOf('__') === -1;
   });
 }
-function _cuentaActual() {
+function cuentaActual_() {
   var e = '';
   try { e = Session.getEffectiveUser().getEmail() || ''; } catch (x) {}
   if (!e) { try { e = Session.getActiveUser().getEmail() || ''; } catch (y) {} }
   return String(e).toLowerCase();
 }
-function _identidadOk() { return _cuentaActual() === String(CONFIG.correo).toLowerCase(); }
+function identidadOk_() { return cuentaActual_() === String(CONFIG.correo).toLowerCase(); }
 /** '' = se puede instalar y trabajar en esta cuenta; si no, el motivo en llano. */
-function _motivoNoInstalable() {
-  if (!_tieneClaves(EQUIPO) || !_tieneClaves(COMUN)) {
+function motivoNoInstalable_() {
+  if (!tieneClaves_(EQUIPO) || !tieneClaves_(COMUN)) {
     return 'configuración vacía (este código no lleva la lista del equipo: cópialo otra vez desde la página de instalación, abierta con el enlace completo)';
   }
   if (!RE_WEBHOOK.test(String(COMUN.webhook || ''))) return 'configuración incompleta (falta el webhook de Slack o no tiene el formato esperado)';
-  var e = _cuentaActual();
+  var e = cuentaActual_();
   if (!e) return 'no se puede leer la cuenta de Google que ejecuta el script';
-  if (!_fichaDe(e)) return 'esta cuenta no está en la lista del equipo';
-  if (!_identidadOk()) return 'la cuenta cambió durante la ejecución';
+  if (!fichaDe_(e)) return 'esta cuenta no está en la lista del equipo';
+  if (!identidadOk_()) return 'la cuenta cambió durante la ejecución';
   if (!RE_SLACK_ID.test(String(CONFIG.slack_id || ''))) return 'a esta persona le falta el slack_id en la lista (o no tiene el formato de Slack)';
   if (!RE_WEBHOOK.test(String(CONFIG.webhook || ''))) return 'el webhook de esta persona no tiene el formato esperado';
   if (!CONFIG.enviados && !CONFIG.recibidos) return 'enviados y recibidos están apagados: no hay nada que vigilar';
   return '';
 }
-function _configOk(registrar) {
-  var motivo = _motivoNoInstalable();
-  if (motivo && registrar) Logger.log('PARADO: ' + motivo + ' · cuenta: ' + (_cuentaActual() || 'desconocida') + '. No se hace nada.');
+function configOk_(registrar) {
+  var motivo = motivoNoInstalable_();
+  if (motivo && registrar) Logger.log('PARADO: ' + motivo + ' · cuenta: ' + (cuentaActual_() || 'desconocida') + '. No se hace nada.');
   return !motivo;
 }
-function _enPausa() { return !!GmailApp.getUserLabelByName(ETIQUETA_PAUSA); }
-function _modo() { return PropertiesService.getUserProperties().getProperty(CLAVE_MODO) || 'real'; }
-function _puedoTrabajar() {
-  if (!_configOk(true)) return false;
-  if (_enPausa()) { Logger.log('En pausa: existe la etiqueta «' + ETIQUETA_PAUSA + '». No se hace nada.'); return false; }
+function enPausa_() { return !!GmailApp.getUserLabelByName(ETIQUETA_PAUSA); }
+function modo_() { return PropertiesService.getUserProperties().getProperty(CLAVE_MODO) || 'real'; }
+function puedoTrabajar_() {
+  if (!configOk_(true)) return false;
+  if (typeof ARRANQUE !== 'undefined' && ARRANQUE && ARRANQUE.accion === 'sin-permisos') {
+    Logger.log('PARADO: ' + MOTIVO_PERMISOS + '. No se hace nada.');
+    return false;
+  }
+  if (enPausa_()) { Logger.log('En pausa: existe la etiqueta «' + ETIQUETA_PAUSA + '». No se hace nada.'); return false; }
   return true;
 }
 
 // ── Enviados: auto-etiquetado y seguimiento ────────────────────────────────
 function autoetiquetar() {
   if (!CONFIG.enviados) { Logger.log('Enviados apagado para ' + CONFIG.persona + '.'); return 0; }
-  if (!_puedoTrabajar()) return 0;
-  var ensayo = _modo() === 'ensayo';
+  if (!puedoTrabajar_()) return 0;
+  var ensayo = modo_() === 'ensayo';
   var props = PropertiesService.getUserProperties();
   var desde = Number(props.getProperty(CLAVE_ULTIMO_AUTO) || 0);
   if (!desde) {
-    props.setProperty(CLAVE_ULTIMO_AUTO, String(_ahora()));
+    props.setProperty(CLAVE_ULTIMO_AUTO, String(ahora_()));
     Logger.log('Primera ejecución: punto de partida en ahora, no se etiqueta el histórico.');
     return 0;
   }
-  var hilos = _buscarHilos(BUSQUEDA_ENVIADOS);
-  var mias = _misDirecciones();
-  var lSeguir = ensayo ? null : _etiqueta(ETIQUETA_SEGUIR);
+  var hilos = buscarHilos_(BUSQUEDA_ENVIADOS);
+  var mias = misDirecciones_();
+  var lSeguir = ensayo ? null : etiqueta_(ETIQUETA_SEGUIR);
   var lAvisado = GmailApp.getUserLabelByName(ETIQUETA_AVISADO);
   var etiquetados = 0, visto = 0;
   hilos.forEach(function (hilo) {
     var nuevos = [];
     hilo.getMessages().forEach(function (m) {
-      if (!_esMio(_email(m.getFrom()), mias)) return;
+      if (!esMio_(email_(m.getFrom()), mias)) return;
       var t = m.getDate().getTime();
       if (t <= desde) return;
       if (t > visto) visto = t;
       nuevos.push(m);
     });
     if (!nuevos.length) return;
-    if (_tieneEtiqueta(hilo, ETIQUETA_NO)) return;          // la persona dijo «nunca»
+    if (tieneEtiqueta_(hilo, ETIQUETA_NO)) return;          // la persona dijo «nunca»
     var bueno = null;
-    for (var i = 0; i < nuevos.length; i++) { if (_motivoEnvio(nuevos[i]) === '') { bueno = nuevos[i]; break; } }
+    for (var i = 0; i < nuevos.length; i++) { if (motivoEnvio_(nuevos[i]) === '') { bueno = nuevos[i]; break; } }
     if (!bueno) return;
     etiquetados++;
     if (ensayo) { Logger.log('ENSAYO → etiquetaría 48h: ' + (bueno.getSubject() || '(sin asunto)')); return; }
     try { hilo.addLabel(lSeguir); } catch (e) { Logger.log('No se pudo etiquetar: ' + e); etiquetados--; return; }
     if (lAvisado) { try { hilo.removeLabel(lAvisado); } catch (e2) {} }
     props.deleteProperty(PREFIJO_MEMORIA + hilo.getId());
-    Logger.log('Etiquetado 48h: ' + (bueno.getSubject() || '(sin asunto)') + ' → ' + _clienteDe(bueno));
+    Logger.log('Etiquetado 48h: ' + (bueno.getSubject() || '(sin asunto)') + ' → ' + clienteDe_(bueno));
   });
-  if (!ensayo) props.setProperty(CLAVE_ULTIMO_AUTO, String(visto || _ahora()));
+  if (!ensayo) props.setProperty(CLAVE_ULTIMO_AUTO, String(visto || ahora_()));
   Logger.log('Auto-etiquetado · revisados: ' + hilos.length + ' · etiquetados: ' + etiquetados + (ensayo ? ' (ENSAYO)' : ''));
   return etiquetados;
 }
-function _motivoEnvio(m) {
+function motivoEnvio_(m) {
   try { var auto = m.getHeader('Auto-Submitted') || ''; if (auto && !/^no$/i.test(auto)) return 'respuesta automática mía'; } catch (e) {}
-  if (_esInvitacionCalendario(m.getSubject())) return 'invitación de calendario';
-  if (!_destinatariosExternos(m).length) return 'sin destinatarios externos (solo gente de casa o robots)';
+  if (esInvitacionCalendario_(m.getSubject())) return 'invitación de calendario';
+  if (!destinatariosExternos_(m).length) return 'sin destinatarios externos (solo gente de casa o robots)';
   return '';
 }
-function procesar() { return _pasada(_modo() === 'ensayo'); }
-function simular() { return _pasada(true); }
-function _pasada(soloRegistro) {
+function procesar() {
+  if (recienInstalado_('procesar')) return { avisos: 0, respondidos: 0, ignorados: 0, recibidos: 0 };
+  return pasada_(modo_() === 'ensayo');
+}
+function simular() { return pasada_(true); }
+function pasada_(soloRegistro) {
   var r = { avisos: 0, respondidos: 0, ignorados: 0, recibidos: 0 };
-  if (!_puedoTrabajar()) return r;
+  if (!puedoTrabajar_()) return r;
   var cupo = { quedan: MAX_AVISOS_POR_PASADA };
-  if (CONFIG.enviados) _recorrerEnviados(soloRegistro, r, cupo);
-  if (CONFIG.recibidos) _recorrerRecibidos(soloRegistro, r, cupo);
+  if (CONFIG.enviados) recorrerEnviados_(soloRegistro, r, cupo);
+  if (CONFIG.recibidos) recorrerRecibidos_(soloRegistro, r, cupo);
   Logger.log('Resumen · avisos enviados: ' + r.avisos + ' · recibidos: ' + r.recibidos + ' · respondidos: ' +
     r.respondidos + ' · ignorados: ' + r.ignorados + (soloRegistro ? ' (simulado)' : ''));
   return r;
 }
-function _recorrerEnviados(soloRegistro, r, cupo) {
-  var hilos = _buscarHilos(BUSQUEDA_SEGUIMIENTO);
+function recorrerEnviados_(soloRegistro, r, cupo) {
+  var hilos = buscarHilos_(BUSQUEDA_SEGUIMIENTO);
   Logger.log('Hilos en seguimiento: ' + hilos.length);
   var props = PropertiesService.getUserProperties();
   var lSeguir = GmailApp.getUserLabelByName(ETIQUETA_SEGUIR);
-  var lAvisado = soloRegistro ? null : _etiqueta(ETIQUETA_AVISADO);
+  var lAvisado = soloRegistro ? null : etiqueta_(ETIQUETA_AVISADO);
   for (var i = 0; i < hilos.length; i++) {
     var hilo = hilos[i];
-    if (_tieneEtiqueta(hilo, ETIQUETA_NO)) {                 // apagado a mano en este hilo
+    if (tieneEtiqueta_(hilo, ETIQUETA_NO)) {                 // apagado a mano en este hilo
       if (!soloRegistro && lSeguir) { try { hilo.removeLabel(lSeguir); } catch (e0) {} }
       r.ignorados++; continue;
     }
-    var d = _analizarEnvio(hilo);
+    var d = analizarEnvio_(hilo);
     if (!d.enviadoId) {
       Logger.log('Sin envío propio, se ignora: ' + d.asunto);
       if (!soloRegistro && lSeguir) { try { hilo.removeLabel(lSeguir); } catch (e) {} }
@@ -416,10 +445,10 @@ function _recorrerEnviados(soloRegistro, r, cupo) {
     if (d.horas < CONFIG.horas) continue;
     if (props.getProperty(PREFIJO_MEMORIA + d.threadId) === d.enviadoId) continue;
     if (cupo.quedan <= 0) { Logger.log('Tope de avisos por pasada; el resto, en la siguiente.'); break; }
-    var carga = _carga(d.threadId, d.asunto, d.cliente, d.horas, d.fecha,
-      '⏰ Sin respuesta en ' + d.horas + ' h · ' + d.cliente + ' · ' + _asuntoCorto(d.asunto));
+    var carga = carga_(d.threadId, d.asunto, d.cliente, d.horas, d.fecha,
+      '⏰ Sin respuesta en ' + d.horas + ' h · ' + d.cliente + ' · ' + asuntoCorto_(d.asunto));
     if (soloRegistro) { Logger.log('SIMULADO → ' + JSON.stringify(carga)); r.avisos++; cupo.quedan--; continue; }
-    if (_enviar(CONFIG.webhook, carga)) {
+    if (enviar_(CONFIG.webhook, carga)) {
       props.setProperty(PREFIJO_MEMORIA + d.threadId, d.enviadoId);
       try { hilo.addLabel(lAvisado); } catch (e4) {}
       if (lSeguir) { try { hilo.removeLabel(lSeguir); } catch (e5) {} }
@@ -430,24 +459,24 @@ function _recorrerEnviados(soloRegistro, r, cupo) {
     }
   }
 }
-function _analizarEnvio(hilo) {
+function analizarEnvio_(hilo) {
   var d = { threadId: hilo.getId(), enviadoId: '', asunto: hilo.getFirstMessageSubject() || '(sin asunto)',
     cliente: '', fecha: '', horas: 0, respuesta: false };
   var mensajes = hilo.getMessages();
-  var mias = _misDirecciones();
+  var mias = misDirecciones_();
   var idx = -1;
-  for (var i = mensajes.length - 1; i >= 0; i--) { if (_esMio(_email(mensajes[i].getFrom()), mias)) { idx = i; break; } }
+  for (var i = mensajes.length - 1; i >= 0; i--) { if (esMio_(email_(mensajes[i].getFrom()), mias)) { idx = i; break; } }
   if (idx === -1) return d;
   var enviado = mensajes[idx];
   d.enviadoId = enviado.getId();
   d.asunto = enviado.getSubject() || d.asunto;
-  d.cliente = _clienteDe(enviado);
+  d.cliente = clienteDe_(enviado);
   d.fecha = Utilities.formatDate(enviado.getDate(), CONFIG.zona, 'dd/MM HH:mm');
-  d.horas = _horasDesde(enviado.getDate().getTime());
+  d.horas = horasDesde_(enviado.getDate().getTime());
   for (var j = idx + 1; j < mensajes.length; j++) {
-    var m = mensajes[j], from = m.getFrom() || '', email = _email(from);
-    if (_esMio(email, mias) || _esInterno(email)) continue;
-    if (_esAutomatico(from, m)) continue;
+    var m = mensajes[j], from = m.getFrom() || '', email = email_(from);
+    if (esMio_(email, mias) || esInterno_(email)) continue;
+    if (esAutomatico_(from, m)) continue;
     d.respuesta = true; break;
   }
   return d;
@@ -463,35 +492,35 @@ function _analizarEnvio(hilo) {
  *   · remitentes a los que nunca has escrito (recibidos_solo_conocidos) · nada anterior a la instalación
  *   · hilos con la etiqueta «48h-no»
  */
-function _recorrerRecibidos(soloRegistro, r, cupo) {
+function recorrerRecibidos_(soloRegistro, r, cupo) {
   var props = PropertiesService.getUserProperties();
   var inicio = Number(props.getProperty(CLAVE_INICIO_RECIBIDOS) || 0);
   if (!inicio) {
-    if (!soloRegistro) props.setProperty(CLAVE_INICIO_RECIBIDOS, String(_ahora()));
+    if (!soloRegistro) props.setProperty(CLAVE_INICIO_RECIBIDOS, String(ahora_()));
     Logger.log('[recibidos] Primera ejecución: punto de partida en ahora, no se avisa del histórico.');
     return;
   }
-  var mias = _misDirecciones();
-  var lPor = soloRegistro ? null : _etiqueta(ETIQUETA_POR_CONTESTAR);
-  _buscarHilos('label:' + ETIQUETA_POR_CONTESTAR).forEach(function (hilo) {
-    var d = _analizarRecibido(hilo, mias, inicio);
+  var mias = misDirecciones_();
+  var lPor = soloRegistro ? null : etiqueta_(ETIQUETA_POR_CONTESTAR);
+  buscarHilos_('label:' + ETIQUETA_POR_CONTESTAR).forEach(function (hilo) {
+    var d = analizarRecibido_(hilo, mias, inicio);
     if (d.contestado && !soloRegistro) {
       try { hilo.removeLabel(lPor); } catch (e) {}
       props.deleteProperty(PREFIJO_RECIBIDOS + d.threadId);
     }
   });
-  var hilos = _buscarHilos(BUSQUEDA_RECIBIDOS);
+  var hilos = buscarHilos_(BUSQUEDA_RECIBIDOS);
   Logger.log('[recibidos] hilos revisados: ' + hilos.length);
   for (var i = 0; i < hilos.length; i++) {
-    var d = _analizarRecibido(hilos[i], mias, inicio);
+    var d = analizarRecibido_(hilos[i], mias, inicio);
     if (!d.avisar) continue;
     if (props.getProperty(PREFIJO_RECIBIDOS + d.threadId) === d.mensajeId) continue;
     if (cupo.quedan <= 0) { Logger.log('[recibidos] Tope de avisos por pasada.'); break; }
-    var nombre = _soloNombre(d.remitente);
-    var carga = _carga(d.threadId, d.asunto, nombre, d.horas, d.fecha,
-      '📬 Sin contestar en ' + d.horas + ' h · ' + nombre + ' · ' + _asuntoCorto(d.asunto));
+    var nombre = soloNombre_(d.remitente);
+    var carga = carga_(d.threadId, d.asunto, nombre, d.horas, d.fecha,
+      '📬 Sin contestar en ' + d.horas + ' h · ' + nombre + ' · ' + asuntoCorto_(d.asunto));
     if (soloRegistro) { Logger.log('[recibidos] SIMULADO → ' + JSON.stringify(carga)); r.recibidos++; cupo.quedan--; continue; }
-    if (_enviar(CONFIG.webhook, carga)) {
+    if (enviar_(CONFIG.webhook, carga)) {
       props.setProperty(PREFIJO_RECIBIDOS + d.threadId, d.mensajeId);
       try { hilos[i].addLabel(lPor); } catch (e2) {}
       r.recibidos++; cupo.quedan--;
@@ -499,48 +528,48 @@ function _recorrerRecibidos(soloRegistro, r, cupo) {
     }
   }
 }
-function _analizarRecibido(hilo, mias, inicio) {
+function analizarRecibido_(hilo, mias, inicio) {
   var d = { threadId: hilo.getId(), mensajeId: '', asunto: hilo.getFirstMessageSubject() || '(sin asunto)',
     remitente: '', horas: 0, fecha: '', contestado: false, avisar: false, motivo: '' };
-  if (_tieneEtiqueta(hilo, ETIQUETA_NO)) { d.motivo = 'hilo con 48h-no'; return d; }
+  if (tieneEtiqueta_(hilo, ETIQUETA_NO)) { d.motivo = 'hilo con 48h-no'; return d; }
   var mensajes = hilo.getMessages();
   var ultimo = null;
   for (var i = mensajes.length - 1; i >= 0; i--) {
-    if (!_esAutomatico(mensajes[i].getFrom() || '', mensajes[i]) || _esMio(_email(mensajes[i].getFrom()), mias)) { ultimo = mensajes[i]; break; }
+    if (!esAutomatico_(mensajes[i].getFrom() || '', mensajes[i]) || esMio_(email_(mensajes[i].getFrom()), mias)) { ultimo = mensajes[i]; break; }
   }
   if (!ultimo) { d.motivo = 'solo mensajes automáticos'; return d; }
-  var from = ultimo.getFrom() || '', email = _email(from);
+  var from = ultimo.getFrom() || '', email = email_(from);
   d.mensajeId = ultimo.getId();
   d.asunto = ultimo.getSubject() || d.asunto;
   d.remitente = from;
   d.fecha = Utilities.formatDate(ultimo.getDate(), CONFIG.zona, 'dd/MM HH:mm');
-  d.horas = _horasDesde(ultimo.getDate().getTime());
-  if (_esMio(email, mias)) { d.contestado = true; d.motivo = 'ya contestado'; return d; }
-  var motivo = _ruidoRecibido(ultimo, email, mias, inicio);
+  d.horas = horasDesde_(ultimo.getDate().getTime());
+  if (esMio_(email, mias)) { d.contestado = true; d.motivo = 'ya contestado'; return d; }
+  var motivo = ruidoRecibido_(ultimo, email, mias, inicio);
   if (motivo) { d.motivo = motivo; return d; }
   if (d.horas < CONFIG.horas) { d.motivo = 'solo ' + d.horas + ' h'; return d; }
   d.avisar = true;
   return d;
 }
-function _ruidoRecibido(m, email, mias, inicio) {
+function ruidoRecibido_(m, email, mias, inicio) {
   if (m.getDate().getTime() <= inicio) return 'anterior a la instalación';
-  if (_esInterno(email)) return 'remitente de casa';
-  if (_esAutomatico(m.getFrom() || '', m)) return 'automático / boletín';
+  if (esInterno_(email)) return 'remitente de casa';
+  if (esAutomatico_(m.getFrom() || '', m)) return 'automático / boletín';
   try { if (m.getHeader('List-Id')) return 'lista de correo'; } catch (e) {}
-  if (_esInvitacionCalendario(m.getSubject())) return 'invitación de calendario';
-  var para = _direcciones(m.getTo ? m.getTo() : '');
-  var cc = _direcciones(m.getCc ? m.getCc() : '');
-  var enPara = para.some(function (x) { return _esMio(x, mias); });
-  if (!enPara) return cc.some(function (x) { return _esMio(x, mias); }) ? 'estás solo en Cc' : 'no estás en Para (lista o Cco)';
+  if (esInvitacionCalendario_(m.getSubject())) return 'invitación de calendario';
+  var para = direcciones_(m.getTo ? m.getTo() : '');
+  var cc = direcciones_(m.getCc ? m.getCc() : '');
+  var enPara = para.some(function (x) { return esMio_(x, mias); });
+  if (!enPara) return cc.some(function (x) { return esMio_(x, mias); }) ? 'estás solo en Cc' : 'no estás en Para (lista o Cco)';
   if (para.length + cc.length > MAX_DESTINATARIOS_RECIBIDOS) return 'envío a muchas personas';
-  if (CONFIG.recibidos_solo_conocidos && !_esConocido(email)) return 'remitente al que nunca has escrito';
+  if (CONFIG.recibidos_solo_conocidos && !esConocido_(email)) return 'remitente al que nunca has escrito';
   return '';
 }
-var _conocidosMemo = {};
-function _esConocido(email) {
+var conocidosMemo_ = {};
+function esConocido_(email) {
   var e = String(email || '').toLowerCase();
   if (!e) return false;
-  if (_conocidosMemo.hasOwnProperty(e)) return _conocidosMemo[e];
+  if (conocidosMemo_.hasOwnProperty(e)) return conocidosMemo_[e];
   var cache = null;
   try { cache = (typeof CacheService !== 'undefined') ? CacheService.getUserCache() : null; } catch (x) {}
   var guardado = cache ? cache.get('k48::' + e) : null;
@@ -550,38 +579,38 @@ function _esConocido(email) {
     si = GmailApp.search('in:sent to:' + e, 0, 1).length > 0;
     if (cache) { try { cache.put('k48::' + e, si ? '1' : '0', 21600); } catch (y) {} }
   }
-  _conocidosMemo[e] = si;
+  conocidosMemo_[e] = si;
   return si;
 }
 function diagnosticar() {
   Logger.log('=== DIAGNÓSTICO · ' + CONFIG.nombre + ' <' + CONFIG.correo + '> ===');
-  Logger.log('Cuenta actual: ' + (_cuentaActual() || '(desconocida)') + (_identidadOk() ? ' ✔' : ' ✘ NO COINCIDE: no instales aquí'));
-  Logger.log('Modo: ' + _modo() + ' · Pausa: ' + (_enPausa() ? 'SÍ' : 'no') + ' · umbral ' + CONFIG.horas + ' h' +
+  Logger.log('Cuenta actual: ' + (cuentaActual_() || '(desconocida)') + (identidadOk_() ? ' ✔' : ' ✘ NO COINCIDE: no instales aquí'));
+  Logger.log('Modo: ' + modo_() + ' · Pausa: ' + (enPausa_() ? 'SÍ' : 'no') + ' · umbral ' + CONFIG.horas + ' h' +
     (CONFIG.solo_laborables ? ' laborables' : '') + ' · enviados ' + (CONFIG.enviados ? 'SÍ' : 'NO') +
     ' · recibidos ' + (CONFIG.recibidos ? 'SÍ' : 'NO') + ' · Slack ' + CONFIG.slack_id + ' (' + CONFIG.destino + ')');
-  var mias = _misDirecciones();
+  var mias = misDirecciones_();
   Logger.log('--- ENVIADOS recientes (qué se etiquetaría) ---');
-  _buscarHilos(BUSQUEDA_ENVIADOS).slice(0, 15).forEach(function (hilo, i) {
-    var propios = hilo.getMessages().filter(function (m) { return _esMio(_email(m.getFrom()), mias); });
+  buscarHilos_(BUSQUEDA_ENVIADOS).slice(0, 15).forEach(function (hilo, i) {
+    var propios = hilo.getMessages().filter(function (m) { return esMio_(email_(m.getFrom()), mias); });
     if (!propios.length) return;
-    var m = propios[propios.length - 1], motivo = _motivoEnvio(m);
+    var m = propios[propios.length - 1], motivo = motivoEnvio_(m);
     Logger.log('· ' + (i + 1) + ') ' + (m.getSubject() || '(sin asunto)') + ' → ' + (motivo ? 'NO — ' + motivo : 'SÍ (48h)'));
   });
   Logger.log('--- RECIBIDOS en bandeja (qué avisaría el «revés» si estuviera encendido, sin mirar la fecha de instalación) ---');
-  _buscarHilos(BUSQUEDA_RECIBIDOS).slice(0, 25).forEach(function (hilo, i) {
-    var d = _analizarRecibido(hilo, mias, 0);
-    Logger.log('· ' + (i + 1) + ') ' + d.asunto + ' · ' + _soloNombre(d.remitente) + ' · ' + d.horas + ' h → ' +
+  buscarHilos_(BUSQUEDA_RECIBIDOS).slice(0, 25).forEach(function (hilo, i) {
+    var d = analizarRecibido_(hilo, mias, 0);
+    Logger.log('· ' + (i + 1) + ') ' + d.asunto + ' · ' + soloNombre_(d.remitente) + ' · ' + d.horas + ' h → ' +
       (d.avisar ? 'AVISARÍA' : 'no — ' + d.motivo));
   });
   Logger.log('=== FIN ===');
 }
 
 // ── Utilidades ──────────────────────────────────────────────────────────────
-function _carga(threadId, asunto, quien, horas, fecha, texto) {
+function carga_(threadId, asunto, quien, horas, fecha, texto) {
   return { account: CONFIG.slack_id, asunto: asunto, remitente: quien, horas: horas, fecha: fecha,
     enlace: 'https://mail.google.com/mail/u/0/#all/' + threadId, texto: texto };
 }
-function _enviar(url, carga) {
+function enviar_(url, carga) {
   if (!url || String(url).indexOf('__') !== -1) { Logger.log('Sin webhook: no se envía nada.'); return false; }
   try {
     var r = UrlFetchApp.fetch(url, { method: 'post', contentType: 'application/json',
@@ -592,60 +621,60 @@ function _enviar(url, carga) {
     return false;
   } catch (err) { Logger.log('Error al llamar al webhook: ' + err); return false; }
 }
-function _misDirecciones() {
+function misDirecciones_() {
   var out = [];
   var add = function (x) { x = String(x || '').toLowerCase(); if (x && out.indexOf(x) === -1) out.push(x); };
   add(CONFIG.correo);
-  add(_cuentaActual());
+  add(cuentaActual_());
   try { GmailApp.getAliases().forEach(add); } catch (e) {}
   return out;
 }
-function _esMio(email, mias) {
+function esMio_(email, mias) {
   var e = String(email || '').toLowerCase();
-  return !!e && (mias || _misDirecciones()).indexOf(e) !== -1;
+  return !!e && (mias || misDirecciones_()).indexOf(e) !== -1;
 }
-function _esInterno(email) {
+function esInterno_(email) {
   var e = String(email || '').toLowerCase();
   if (!e) return true;
   var suf = '@' + String(CONFIG.dominio).toLowerCase();
   return e.length > suf.length && e.slice(-suf.length) === suf;
 }
-function _esAutomatico(from, msg) {
+function esAutomatico_(from, msg) {
   if (ROBOTS.test(String(from || '').toLowerCase())) return true;
   try { if (msg.getHeader('List-Unsubscribe')) return true; } catch (e) {}
   try { if (/bulk|list|junk|auto_reply/i.test(msg.getHeader('Precedence') || '')) return true; } catch (e2) {}
   try { var a = msg.getHeader('Auto-Submitted'); if (a && !/^no$/i.test(a)) return true; } catch (e3) {}
   return false;
 }
-function _esInvitacionCalendario(asunto) {
+function esInvitacionCalendario_(asunto) {
   return /^\s*(invitaci[oó]n|invitation|aceptado|accepted|rechazado|declined|actualizaci[oó]n invitaci[oó]n|updated invitation|cancelado|canceled|cancelled)\s*:/i.test(String(asunto || ''));
 }
-function _destinatariosExternos(m) {
+function destinatariosExternos_(m) {
   var lista = '';
   try { lista = (m.getTo() || '') + ',' + (m.getCc() || ''); } catch (e) { return []; }
   var out = [];
-  _direcciones(lista).forEach(function (e) {
-    if (_esInterno(e) || _esMio(e)) return;
+  direcciones_(lista).forEach(function (e) {
+    if (esInterno_(e) || esMio_(e)) return;
     if (ROBOTS.test(e)) return;
     if (out.indexOf(e) === -1) out.push(e);
   });
   return out;
 }
-function _direcciones(lista) {
+function direcciones_(lista) {
   var out = [];
-  String(lista || '').split(',').forEach(function (t) { var e = _email(t).toLowerCase(); if (e) out.push(e); });
+  String(lista || '').split(',').forEach(function (t) { var e = email_(t).toLowerCase(); if (e) out.push(e); });
   return out;
 }
-function _clienteDe(m) {
+function clienteDe_(m) {
   var para = '';
   try { para = m.getTo() || ''; } catch (e) {}
-  return _soloNombre(String(para).split(',')[0].trim()) || '(sin destinatario)';
+  return soloNombre_(String(para).split(',')[0].trim()) || '(sin destinatario)';
 }
-function _tieneEtiqueta(hilo, nombre) {
+function tieneEtiqueta_(hilo, nombre) {
   try { return hilo.getLabels().some(function (l) { return l.getName() === nombre; }); } catch (e) { return false; }
 }
-function _horasDesde(t) {
-  var ahora = _ahora();
+function horasDesde_(t) {
+  var ahora = ahora_();
   if (!CONFIG.solo_laborables) return Math.floor((ahora - t) / 3600000);
   var horas = 0, paso = 3600000, tope = 24 * 45;
   for (var x = t; x + paso <= ahora && tope-- > 0; x += paso) {
@@ -654,7 +683,7 @@ function _horasDesde(t) {
   }
   return horas;
 }
-function _buscarHilos(consulta) {
+function buscarHilos_(consulta) {
   var out = [];
   for (var inicio = 0; inicio < MAX_HILOS; inicio += 50) {
     var lote = GmailApp.search(consulta, inicio, 50);
@@ -663,26 +692,26 @@ function _buscarHilos(consulta) {
   }
   return out;
 }
-function _email(from) {
+function email_(from) {
   var m = String(from || '').match(/<([^>]+)>/);
   if (m) return m[1].trim();
   m = String(from || '').match(/[^\s<>,;"]+@[^\s<>,;"]+/);
   return m ? m[0].trim() : '';
 }
-function _soloNombre(remitente) {
+function soloNombre_(remitente) {
   var r = String(remitente || '').trim();
   var nombre = r.replace(/\s*<[^>]*>\s*/g, '').replace(/["']/g, '').trim();
   if (nombre && nombre.indexOf('@') === -1) return nombre;
-  var email = _email(r) || nombre;
+  var email = email_(r) || nombre;
   return (email.split('@')[0] || email).replace(/[<>]/g, '').trim();
 }
-function _asuntoCorto(asunto) {
+function asuntoCorto_(asunto) {
   var a = String(asunto || '').trim();
   while (/^\s*(re|rv|fwd|fw)\s*:\s*/i.test(a)) a = a.replace(/^\s*(re|rv|fwd|fw)\s*:\s*/i, '');
   a = a.replace(/\s{2,}/g, ' ').trim() || '(sin asunto)';
   return a.length > 60 ? a.slice(0, 59).trim() + '…' : a;
 }
-function _etiqueta(nombre) { return GmailApp.getUserLabelByName(nombre) || GmailApp.createLabel(nombre); }
+function etiqueta_(nombre) { return GmailApp.getUserLabelByName(nombre) || GmailApp.createLabel(nombre); }
 
 // ── ARRANQUE ────────────────────────────────────────────────────────────────
 /**
@@ -690,35 +719,40 @@ function _etiqueta(nombre) { return GmailApp.getUserLabelByName(nombre) || Gmail
  * ✅ INSTALADO · ✅ YA ESTABA INSTALADO · ⏸ DESINSTALADO · ⚠️ (activadores presentes, configuración que no vale)
  * o lanza «❌ NO INSTALADO · …». Con activadores presentes nunca lanza (puede ser una ejecución por activador).
  */
-function _arranque() {
-  var cuenta = _cuentaActual() || 'desconocida';
+function arranque_() {
+  var cuenta = cuentaActual_() || 'desconocida';
   var est;
-  try { est = _estadoActivadores(); }
-  catch (e) { _noInstalado('no se pueden leer los activadores (' + ((e && e.message) || e) + ')'); }
-  var motivo = _motivoNoInstalable();
+  try { est = estadoActivadores_(); }
+  catch (e) { noInstalado_('no se pueden leer los activadores (' + ((e && e.message) || e) + ')'); }
+  var motivo = motivoNoInstalable_();
   if (est.total && motivo) {
     Logger.log('⚠️ HAY ACTIVADORES (' + est.lista + ') PERO ESTA CONFIGURACIÓN NO VALE · ' + motivo + ' · cuenta: ' + cuenta +
       ' · no se toca nada; para quitarlos: desinstalar');
     return { accion: 'sin-config' };
   }
-  if (motivo) _noInstalado(motivo);
+  if (motivo) noInstalado_(motivo);
+  if (faltanPermisos_()) {
+    if (!est.total) noInstalado_(MOTIVO_PERMISOS);
+    Logger.log('⚠️ ' + MOTIVO_PERMISOS + ' · cuenta: ' + cuenta + ' · activadores: ' + est.lista + ' · no se toca nada');
+    return { accion: 'sin-permisos' };
+  }
   if (est.completo) {
     Logger.log('✅ YA ESTABA INSTALADO para ' + CONFIG.nombre + ' · activadores: ' + est.lista);
     return { accion: 'ya' };
   }
-  if (_marcadoDesinstalado()) {
+  if (marcadoDesinstalado_()) {
     Logger.log('⏸ DESINSTALADO a propósito para ' + CONFIG.nombre + ' · no se reinstala solo' +
       (est.total ? ' (quedan activadores sueltos: ' + est.lista + ')' : '') + ' · para volver a activarlo: elige myFunction y pulsa ▷ Ejecutar');
     return { accion: 'desinstalado' };
   }
   var r = '';
-  try { r = _instalarDetalle(est.total ? _modo() : 'real', est.total ? 'reparado (había: ' + est.lista + ')' : '', true); }
+  try { r = instalarDetalle_(est.total ? modo_() : 'real', est.total ? 'reparado (había: ' + est.lista + ')' : '', true); }
   catch (e2) {
     var fallo = 'fallo al crear los activadores (' + ((e2 && e2.message) || e2) + ')';
     if (est.total) { Logger.log('⚠️ ' + fallo + ' · cuenta: ' + cuenta + ' · se reintenta en la próxima ejecución'); return { accion: 'fallo' }; }
-    _noInstalado(fallo);
+    noInstalado_(fallo);
   }
-  if (!r) _noInstalado('no se pudo instalar');
+  if (!r) noInstalado_('no se pudo instalar');
   return { accion: r };
 }
-var ARRANQUE = _arranque();
+var ARRANQUE = arranque_();

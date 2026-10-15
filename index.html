@@ -78,11 +78,11 @@ textarea{display:block;width:100%;height:15em;resize:vertical;font:13px/1.4 var(
 
   <div class="cod">
     <label for="codigo">Código final (es lo que copia el botón)</label>
-    <textarea id="codigo" readonly spellcheck="false" wrap="off" autocomplete="off" aria-describedby="huella"></textarea>
+    <textarea id="codigo" readonly spellcheck="false" wrap="off" autocomplete="off" aria-hidden="true"></textarea>
     <button id="seleccionar" class="boton sec" type="button">Seleccionar todo el código</button>
   </div>
 
-  <p class="pie">Privado: la configuración va dentro del propio enlace (detrás de «#») y no sale de tu navegador. No reenvíes el enlace fuera del equipo.</p>
+  <p class="pie">Privado: la configuración no se sube a ningún servidor; la página la lee del propio enlace (detrás de «#»). Trata el enlace como privado y no lo compartas.</p>
 </main>
 <script>
 (function () {
@@ -90,6 +90,13 @@ textarea{display:block;width:100%;height:15em;resize:vertical;font:13px/1.4 var(
   var MARCA_E = '/*__EQUIPO__*/{}', MARCA_C = '/*__COMUN__*/{}';
   var RE_AVISO = /^https:\/\/hooks\.slack\.com\/triggers\/[A-Za-z0-9\/]+$/;
   var RE_CORREO = /^[^@\s"]+@[^@\s"]+\.[^@\s"]+$/;
+  var RE_SLACK = /^[UW][A-Z0-9]{8,12}$/, RE_SHA = /^[a-f0-9]{64}$/;
+  // Huella SHA-256 del webhook del equipo (solo la huella: el webhook va en el enlace). La fija construir-enlace.mjs --fijar-webhook.
+  var WEBHOOK_SHA256 = 'fe689b89fe4dd3481fe6808f0429e248ddc15abaa7c133acb8cf3c10457cfa46';
+  var CLAVES = ['v', 'comun', 'equipo', 'plantilla_sha256'];
+  var COMUN_TIPOS = { webhook: 'string', destino: 'string', zona: 'string', horas: 'number', enviados: 'boolean',
+    recibidos: 'boolean', solo_laborables: 'boolean', recibidos_solo_conocidos: 'boolean', dominio: 'string' };
+  var FICHA = ['nombre', 'persona', 'slack_id'];
   var $ = function (id) { return document.getElementById(id); };
   var estado = $('estado'), huella = $('huella'), codigo = $('codigo'), copiar = $('copiar'),
       aviso = $('aviso-copia'), correo = $('correo'), enLista = $('en-lista');
@@ -130,8 +137,13 @@ textarea{display:block;width:100%;height:15em;resize:vertical;font:13px/1.4 var(
   function validar(cfg) {
     if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) throw fallo('roto', 'no trae una configuración');
     if (cfg.v !== 1) throw fallo('roto', 'versión de configuración desconocida');
+    if (Object.keys(cfg).sort().join() !== CLAVES.slice().sort().join()) throw fallo('roto', 'la configuración trae campos que no son los suyos');
+    if (typeof cfg.plantilla_sha256 !== 'string' || !RE_SHA.test(cfg.plantilla_sha256)) throw fallo('roto', 'falta la huella del código');
     var c = cfg.comun, e = cfg.equipo;
     if (!c || typeof c !== 'object' || Array.isArray(c)) throw fallo('roto', 'falta la parte común');
+    Object.keys(c).forEach(function (k) {
+      if (!tiene(COMUN_TIPOS, k) || typeof c[k] !== COMUN_TIPOS[k]) throw fallo('roto', 'la parte común trae un campo que no es el suyo');
+    });
     if (typeof c.webhook !== 'string' || !RE_AVISO.test(c.webhook)) throw fallo('roto', 'el aviso de Slack no tiene el formato esperado');
     if (!e || typeof e !== 'object' || Array.isArray(e)) throw fallo('roto', 'falta la lista del equipo');
     var ks = Object.keys(e);
@@ -139,17 +151,37 @@ textarea{display:block;width:100%;height:15em;resize:vertical;font:13px/1.4 var(
     ks.forEach(function (k) {
       var f = e[k];
       if (!RE_CORREO.test(k) || k !== k.toLowerCase()) throw fallo('roto', 'hay un correo mal escrito en la lista');
-      if (!f || typeof f !== 'object' || ['persona', 'nombre', 'slack_id'].some(function (x) { return typeof f[x] !== 'string' || !f[x]; })) {
-        throw fallo('roto', 'hay una ficha incompleta en la lista');
+      if (!f || typeof f !== 'object' || Array.isArray(f) || Object.keys(f).sort().join() !== FICHA.join() ||
+          FICHA.some(function (x) { return typeof f[x] !== 'string' || !f[x]; })) {
+        throw fallo('roto', 'hay una ficha incompleta o con campos de más en la lista');
       }
+      if (!RE_SLACK.test(f.slack_id)) throw fallo('roto', 'hay un usuario de Slack mal escrito en la lista');
     });
     return ks.length;
   }
 
-  function leerPlantilla() {
+  function hex(b) { return Array.prototype.map.call(new Uint8Array(b), function (x) { return ('0' + x.toString(16)).slice(-2); }).join(''); }
+  function sha256(datos) { return crypto.subtle.digest('SHA-256', datos).then(hex); }
+
+  /** El webhook tiene que ser el del equipo: se compara su huella con la de esta página. */
+  function comprobarAviso(cfg) {
+    return sha256(new TextEncoder().encode(cfg.comun.webhook)).then(function (h) {
+      if (!WEBHOOK_SHA256 || h !== WEBHOOK_SHA256) throw fallo('roto', 'el aviso de Slack no es el del equipo');
+    });
+  }
+
+  /** Descarga el código base y exige que sus bytes sean EXACTAMENTE los que firma el enlace (plantilla_sha256). */
+  function leerPlantilla(esperada) {
     return fetch('./codigo.plantilla.gs?t=' + Date.now(), { cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer' })
-      .then(function (r) { if (!r.ok) throw fallo('plantilla', 'no se pudo leer el código (HTTP ' + r.status + ')'); return r.text(); },
-            function () { throw fallo('plantilla', 'no se pudo leer el código (sin conexión)'); });
+      .then(function (r) { if (!r.ok) throw fallo('plantilla', 'no se pudo leer el código (HTTP ' + r.status + ')'); return r.arrayBuffer(); },
+            function () { throw fallo('plantilla', 'no se pudo leer el código (sin conexión)'); })
+      .then(function (b) {
+        return sha256(b).then(function (h) {
+          if (h !== esperada) throw fallo('plantilla', 'el código publicado (' + h.slice(0, 8) + ') no es el de este enlace (' + esperada.slice(0, 8) + ')');
+          try { return { texto: new TextDecoder('utf-8', { fatal: true }).decode(b), huella: h }; }
+          catch (e) { throw fallo('plantilla', 'el código base no es texto válido'); }
+        });
+      });
   }
 
   function veces(t, s) { return t.split(s).length - 1; }
@@ -166,15 +198,12 @@ textarea{display:block;width:100%;height:15em;resize:vertical;font:13px/1.4 var(
   }
 
   function huella8(texto) {
-    if (!(window.crypto && crypto.subtle && window.TextEncoder)) return Promise.resolve('');
-    return crypto.subtle.digest('SHA-256', new TextEncoder().encode(texto)).then(function (b) {
-      return Array.prototype.map.call(new Uint8Array(b).slice(0, 4), function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
-    }, function () { return ''; });
+    return sha256(new TextEncoder().encode(texto)).then(function (h) { return h.slice(0, 8); }, function () { return ''; });
   }
 
   function limpiar() {
     cfgActual = null; codigo.value = ''; copiar.disabled = true;
-    huella.textContent = '—'; huella.dataset.caracteres = '0'; huella.dataset.personas = '0'; huella.dataset.config = '';
+    huella.textContent = '—'; huella.dataset.caracteres = '0'; huella.dataset.personas = '0'; huella.dataset.config = ''; huella.dataset.plantilla = '';
     aviso.textContent = ''; aviso.dataset.copiado = '';
     comprobarCorreo();
   }
@@ -184,7 +213,8 @@ textarea{display:block;width:100%;height:15em;resize:vertical;font:13px/1.4 var(
     limpiar();
     var s = leerFragmento();
     if (!s) { poner('falta-enlace', 'FALTA EL ENLACE · abre el enlace de instalación completo (acaba en «#c=…»). Sin él no hay nada que copiar.'); return; }
-    if (typeof DecompressionStream === 'undefined' || typeof TextDecoder === 'undefined') {
+    if (typeof DecompressionStream === 'undefined' || typeof TextDecoder === 'undefined' || typeof TextEncoder === 'undefined' ||
+        !(window.crypto && window.crypto.subtle)) {
       poner('navegador', 'NAVEGADOR NO COMPATIBLE · abre este enlace en Google Chrome actualizado.'); return;
     }
     poner('cargando', 'CARGANDO…');
@@ -196,10 +226,11 @@ textarea{display:block;width:100%;height:15em;resize:vertical;font:13px/1.4 var(
         texto = t;
         try { cfg = JSON.parse(t); } catch (e) { throw fallo('roto', 'no trae una configuración'); }
         n = validar(cfg);
-        return leerPlantilla();
+        return comprobarAviso(cfg);
       })
+      .then(function () { return leerPlantilla(cfg.plantilla_sha256); })
       .then(function (p) {
-        var final = montar(p, cfg);
+        var final = montar(p.texto, cfg);
         return huella8(texto).then(function (h) {
           if (mia !== ronda) return;
           cfgActual = cfg;
@@ -207,7 +238,9 @@ textarea{display:block;width:100%;height:15em;resize:vertical;font:13px/1.4 var(
           huella.dataset.caracteres = String(final.length);
           huella.dataset.personas = String(n);
           huella.dataset.config = h;
-          huella.textContent = final.length + ' caracteres · ' + n + ' personas' + (h ? ' · config ' + h : '');
+          huella.dataset.plantilla = p.huella.slice(0, 8);
+          huella.textContent = final.length + ' caracteres · ' + n + (n === 1 ? ' persona' : ' personas') + (h ? ' · config ' + h : '') +
+            ' · plantilla ' + p.huella.slice(0, 8);
           copiar.disabled = false;
           poner('listo', 'LISTO · código montado para ' + n + (n === 1 ? ' persona' : ' personas') + '. Pulsa «Copiar código».');
           comprobarCorreo();
@@ -217,7 +250,7 @@ textarea{display:block;width:100%;height:15em;resize:vertical;font:13px/1.4 var(
         if (mia !== ronda) return;
         limpiar();
         var m = (e && e.message) || String(e);
-        if (e && e.tipo === 'plantilla') poner('error-plantilla', 'ERROR DE PLANTILLA · ' + m + '. Recarga la página; si sigue igual, avisa a Uriel.');
+        if (e && e.tipo === 'plantilla') poner('error-plantilla', 'ERROR DE PLANTILLA · ' + m + '. Recarga una vez; si sigue igual, pide un enlace nuevo a Uriel.');
         else poner('enlace-roto', 'ENLACE ROTO · ' + m + '. Pide el enlace otra vez y ábrelo entero, sin cortar.');
       });
   }
@@ -225,7 +258,7 @@ textarea{display:block;width:100%;height:15em;resize:vertical;font:13px/1.4 var(
   function avisar(ok) {
     aviso.dataset.copiado = ok ? 'si' : 'no';
     aviso.textContent = ok
-      ? '✅ Copiado (' + codigo.value.length + ' caracteres). Ahora: Abrir script.new, borrar todo y pegar.'
+      ? '✅ Copiado (' + codigo.value.length + ' caracteres). Ahora pégalo en el proyecto «Correo 48h» (Cmd+A y Cmd+V).'
       : '⚠️ No se pudo copiar solo. El código de abajo ya está seleccionado: pulsa Cmd+C (Mac) o Ctrl+C (Windows).';
   }
 
