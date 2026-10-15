@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex,nofollow">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:,">
+<title>Correo 48h · instalador</title>
+<style>
+:root{--fondo:#f6f5f2;--caja:#fff;--texto:#16171a;--suave:#5b5f66;--borde:#d9d7d1;--acento:#1f5eff;--acento-t:#fff;
+--ok:#0f7a3d;--ok-f:#e5f5ea;--mal:#b3261e;--mal-f:#fdeceb;--esp:#7a5b00;--esp-f:#fff6d6;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root{--fondo:#121316;--caja:#1c1e22;--texto:#f1f1f3;--suave:#a6abb3;--borde:#34373d;--acento:#6f9bff;--acento-t:#0b0c0e;
+--ok:#5fd28e;--ok-f:#12291b;--mal:#ff8a80;--mal-f:#2e1513;--esp:#f2cf66;--esp-f:#2a2410}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--fondo);color:var(--texto);font:20px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:680px;margin:0 auto;padding:28px 16px 48px}
+h1{font-size:34px;line-height:1.15;margin:0 0 4px}
+.sub{margin:0 0 20px;color:var(--suave)}
+.estado{border-radius:14px;padding:16px 18px;font-weight:700;font-size:22px;border:2px solid var(--borde);background:var(--caja);overflow-wrap:anywhere}
+.estado.listo{border-color:var(--ok);background:var(--ok-f);color:var(--ok)}
+.estado.falta-enlace,.estado.enlace-roto,.estado.error-plantilla,.estado.navegador{border-color:var(--mal);background:var(--mal-f);color:var(--mal)}
+.estado.cargando{border-color:var(--esp);background:var(--esp-f);color:var(--esp)}
+#huella{margin:8px 2px 22px;font:16px/1.4 var(--mono);color:var(--suave)}
+ol.pasos{list-style:none;margin:0;padding:0;counter-reset:p}
+ol.pasos>li{counter-increment:p;position:relative;background:var(--caja);border:1px solid var(--borde);border-radius:14px;padding:16px 16px 16px 66px;margin:0 0 12px}
+ol.pasos>li::before{content:counter(p);position:absolute;left:16px;top:16px;width:36px;height:36px;border-radius:50%;background:var(--acento);color:var(--acento-t);font-weight:700;display:grid;place-items:center;font-size:20px}
+ol.pasos p{margin:6px 0 0}
+.boton{display:block;width:100%;min-height:58px;padding:14px 16px;border:0;border-radius:12px;background:var(--acento);color:var(--acento-t);font-weight:700;font-size:21px;line-height:1.2;font-family:inherit;text-align:center;text-decoration:none;cursor:pointer}
+.boton:disabled{opacity:.45;cursor:not-allowed}
+.boton.sec{background:transparent;color:var(--acento);border:2px solid var(--acento);min-height:48px;font-size:18px}
+.boton:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--acento);outline-offset:2px}
+#aviso-copia:empty,#en-lista:empty{display:none}
+#aviso-copia,#en-lista{font-weight:600}
+[data-copiado="si"],[data-resultado="si"]{color:var(--ok)}
+[data-copiado="no"],[data-resultado="no"]{color:var(--mal)}
+kbd{font:600 .85em var(--mono);border:1px solid var(--borde);border-bottom-width:2px;border-radius:6px;padding:0 5px;background:var(--fondo)}
+.lista{background:var(--caja);border:1px solid var(--borde);border-radius:14px;padding:16px;margin:20px 0}
+.lista label,.cod label{display:block;font-weight:700;margin:0 0 8px}
+input[type=email]{width:100%;font:inherit;padding:12px 14px;border-radius:10px;border:2px solid var(--borde);background:var(--fondo);color:var(--texto)}
+.cod{margin:20px 0}
+textarea{display:block;width:100%;height:15em;resize:vertical;font:13px/1.4 var(--mono);padding:12px;border-radius:12px;border:2px solid var(--borde);background:var(--caja);color:var(--texto);white-space:pre;overflow:auto}
+.cod .boton{margin-top:10px}
+.pie{font-size:16px;color:var(--suave);margin-top:24px}
+</style>
+</head>
+<body>
+<main>
+  <h1>Correo 48h</h1>
+  <p class="sub">Instalador para tu Gmail de Influentia. Tarda dos minutos.</p>
+
+  <div id="estado" class="estado cargando" data-estado="cargando" role="status" aria-live="polite">CARGANDO…</div>
+  <p id="huella" data-caracteres="0" data-personas="0" data-config="">—</p>
+  <noscript><p class="estado error-plantilla">Activa JavaScript para usar este instalador.</p></noscript>
+
+  <ol class="pasos">
+    <li>
+      <button id="copiar" class="boton" type="button" disabled>Copiar código</button>
+      <p id="aviso-copia" role="status" aria-live="polite"></p>
+    </li>
+    <li>
+      <a id="abrir" class="boton" href="https://script.new" target="_blank" rel="noopener noreferrer">Abrir script.new</a>
+      <p>Borra todo lo que haya (<kbd>Cmd</kbd>/<kbd>Ctrl</kbd>+<kbd>A</kbd>), pega (<kbd>Cmd</kbd>/<kbd>Ctrl</kbd>+<kbd>V</kbd>) y guarda (<kbd>Cmd</kbd>/<kbd>Ctrl</kbd>+<kbd>S</kbd>).</p>
+    </li>
+    <li>
+      <p style="margin:0">Pulsa <b>▷ Ejecutar</b> y luego <b>Permitir</b>. Abajo, en el registro, tiene que salir <b>✅ INSTALADO</b>.</p>
+    </li>
+  </ol>
+
+  <div class="lista">
+    <label for="correo">¿Estás en la lista? Escribe tu correo</label>
+    <input id="correo" type="email" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="tu correo de Influentia">
+    <p id="en-lista" data-resultado="" role="status" aria-live="polite"></p>
+  </div>
+
+  <div class="cod">
+    <label for="codigo">Código final (es lo que copia el botón)</label>
+    <textarea id="codigo" readonly spellcheck="false" wrap="off" autocomplete="off" aria-describedby="huella"></textarea>
+    <button id="seleccionar" class="boton sec" type="button">Seleccionar todo el código</button>
+  </div>
+
+  <p class="pie">Privado: la configuración va dentro del propio enlace (detrás de «#») y no sale de tu navegador. No reenvíes el enlace fuera del equipo.</p>
+</main>
+<script>
+(function () {
+  'use strict';
+  var MARCA_E = '/*__EQUIPO__*/{}', MARCA_C = '/*__COMUN__*/{}';
+  var RE_AVISO = /^https:\/\/hooks\.slack\.com\/triggers\/[A-Za-z0-9\/]+$/;
+  var RE_CORREO = /^[^@\s"]+@[^@\s"]+\.[^@\s"]+$/;
+  var $ = function (id) { return document.getElementById(id); };
+  var estado = $('estado'), huella = $('huella'), codigo = $('codigo'), copiar = $('copiar'),
+      aviso = $('aviso-copia'), correo = $('correo'), enLista = $('en-lista');
+  var cfgActual = null, ronda = 0;
+  var tiene = function (o, k) { return Object.prototype.hasOwnProperty.call(o, k); };
+
+  function fallo(tipo, msg) { var e = new Error(msg); e.tipo = tipo; return e; }
+  function poner(tipo, texto) { estado.dataset.estado = tipo; estado.className = 'estado ' + tipo; estado.textContent = texto; }
+
+  function leerFragmento() {
+    var m = /(?:^#|&)c=([^&]*)/.exec(location.hash || '');
+    if (!m) return '';
+    var s = m[1];
+    try { s = decodeURIComponent(s); } catch (e) { /* se queda tal cual */ }
+    s = s.replace(/\s+/g, '');
+    // Chats y correos a veces pegan un punto o paréntesis al final del enlace.
+    var limpio = s.replace(/[^A-Za-z0-9_\-+\/=]+$/, '');
+    return (s && !limpio) ? '!' : limpio;   // solo basura → «!» (ENLACE ROTO, no «falta»)
+  }
+
+  function bytesDe(s) {
+    if (/[^A-Za-z0-9_\-+\/=]/.test(s)) throw fallo('roto', 'tiene caracteres que no son del enlace');
+    s = s.replace(/-/g, '+').replace(/_/g, '/').replace(/=+$/, '');
+    if (s.length % 4 === 1) throw fallo('roto', 'está cortado');
+    while (s.length % 4) s += '=';
+    var bin = atob(s), u = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    return u;
+  }
+
+  function inflar(u) {
+    var flujo = new Blob([u]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    return new Response(flujo).arrayBuffer().then(function (b) {
+      return new TextDecoder('utf-8', { fatal: true }).decode(b);
+    });
+  }
+
+  function validar(cfg) {
+    if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) throw fallo('roto', 'no trae una configuración');
+    if (cfg.v !== 1) throw fallo('roto', 'versión de configuración desconocida');
+    var c = cfg.comun, e = cfg.equipo;
+    if (!c || typeof c !== 'object' || Array.isArray(c)) throw fallo('roto', 'falta la parte común');
+    if (typeof c.webhook !== 'string' || !RE_AVISO.test(c.webhook)) throw fallo('roto', 'el aviso de Slack no tiene el formato esperado');
+    if (!e || typeof e !== 'object' || Array.isArray(e)) throw fallo('roto', 'falta la lista del equipo');
+    var ks = Object.keys(e);
+    if (!ks.length) throw fallo('roto', 'la lista del equipo está vacía');
+    ks.forEach(function (k) {
+      var f = e[k];
+      if (!RE_CORREO.test(k) || k !== k.toLowerCase()) throw fallo('roto', 'hay un correo mal escrito en la lista');
+      if (!f || typeof f !== 'object' || ['persona', 'nombre', 'slack_id'].some(function (x) { return typeof f[x] !== 'string' || !f[x]; })) {
+        throw fallo('roto', 'hay una ficha incompleta en la lista');
+      }
+    });
+    return ks.length;
+  }
+
+  function leerPlantilla() {
+    return fetch('./codigo.plantilla.gs?t=' + Date.now(), { cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer' })
+      .then(function (r) { if (!r.ok) throw fallo('plantilla', 'no se pudo leer el código (HTTP ' + r.status + ')'); return r.text(); },
+            function () { throw fallo('plantilla', 'no se pudo leer el código (sin conexión)'); });
+  }
+
+  function veces(t, s) { return t.split(s).length - 1; }
+
+  function montar(p, cfg) {
+    if (veces(p, MARCA_E) !== 1 || veces(p, MARCA_C) !== 1) throw fallo('plantilla', 'el código base no trae sus dos marcadores');
+    var trozos = [[p.indexOf(MARCA_E), MARCA_E, JSON.stringify(cfg.equipo)], [p.indexOf(MARCA_C), MARCA_C, JSON.stringify(cfg.comun)]]
+      .sort(function (a, b) { return a[0] - b[0]; });
+    var out = '', pos = 0;
+    trozos.forEach(function (t) { out += p.slice(pos, t[0]) + t[2]; pos = t[0] + t[1].length; });
+    out += p.slice(pos);
+    if (out.indexOf('/*__EQUIPO__*/') !== -1 || out.indexOf('/*__COMUN__*/') !== -1) throw fallo('roto', 'quedan marcadores sin sustituir');
+    return out;
+  }
+
+  function huella8(texto) {
+    if (!(window.crypto && crypto.subtle && window.TextEncoder)) return Promise.resolve('');
+    return crypto.subtle.digest('SHA-256', new TextEncoder().encode(texto)).then(function (b) {
+      return Array.prototype.map.call(new Uint8Array(b).slice(0, 4), function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+    }, function () { return ''; });
+  }
+
+  function limpiar() {
+    cfgActual = null; codigo.value = ''; copiar.disabled = true;
+    huella.textContent = '—'; huella.dataset.caracteres = '0'; huella.dataset.personas = '0'; huella.dataset.config = '';
+    aviso.textContent = ''; aviso.dataset.copiado = '';
+    comprobarCorreo();
+  }
+
+  function arrancar() {
+    var mia = ++ronda;
+    limpiar();
+    var s = leerFragmento();
+    if (!s) { poner('falta-enlace', 'FALTA EL ENLACE · abre el enlace de instalación completo (acaba en «#c=…»). Sin él no hay nada que copiar.'); return; }
+    if (typeof DecompressionStream === 'undefined' || typeof TextDecoder === 'undefined') {
+      poner('navegador', 'NAVEGADOR NO COMPATIBLE · abre este enlace en Google Chrome actualizado.'); return;
+    }
+    poner('cargando', 'CARGANDO…');
+    var texto = '', cfg = null, n = 0;
+    Promise.resolve()
+      .then(function () { return inflar(bytesDe(s)); })
+      .then(null, function (e) { throw (e && e.tipo) ? e : fallo('roto', 'no se puede abrir'); })
+      .then(function (t) {
+        texto = t;
+        try { cfg = JSON.parse(t); } catch (e) { throw fallo('roto', 'no trae una configuración'); }
+        n = validar(cfg);
+        return leerPlantilla();
+      })
+      .then(function (p) {
+        var final = montar(p, cfg);
+        return huella8(texto).then(function (h) {
+          if (mia !== ronda) return;
+          cfgActual = cfg;
+          codigo.value = final;
+          huella.dataset.caracteres = String(final.length);
+          huella.dataset.personas = String(n);
+          huella.dataset.config = h;
+          huella.textContent = final.length + ' caracteres · ' + n + ' personas' + (h ? ' · config ' + h : '');
+          copiar.disabled = false;
+          poner('listo', 'LISTO · código montado para ' + n + (n === 1 ? ' persona' : ' personas') + '. Pulsa «Copiar código».');
+          comprobarCorreo();
+        });
+      })
+      .then(null, function (e) {
+        if (mia !== ronda) return;
+        limpiar();
+        var m = (e && e.message) || String(e);
+        if (e && e.tipo === 'plantilla') poner('error-plantilla', 'ERROR DE PLANTILLA · ' + m + '. Recarga la página; si sigue igual, avisa a Uriel.');
+        else poner('enlace-roto', 'ENLACE ROTO · ' + m + '. Pide el enlace otra vez y ábrelo entero, sin cortar.');
+      });
+  }
+
+  function avisar(ok) {
+    aviso.dataset.copiado = ok ? 'si' : 'no';
+    aviso.textContent = ok
+      ? '✅ Copiado (' + codigo.value.length + ' caracteres). Ahora: Abrir script.new, borrar todo y pegar.'
+      : '⚠️ No se pudo copiar solo. El código de abajo ya está seleccionado: pulsa Cmd+C (Mac) o Ctrl+C (Windows).';
+  }
+
+  function seleccionar() {
+    try { codigo.focus({ preventScroll: true }); } catch (e) { codigo.focus(); }
+    codigo.select();
+    codigo.setSelectionRange(0, codigo.value.length);
+  }
+
+  function copiaVieja() {
+    seleccionar();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    avisar(ok);
+  }
+
+  copiar.addEventListener('click', function () {
+    if (!codigo.value) return;
+    if (navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext) {
+      navigator.clipboard.writeText(codigo.value).then(function () { avisar(true); }, copiaVieja);
+    } else {
+      copiaVieja();
+    }
+  });
+
+  $('seleccionar').addEventListener('click', function () { if (codigo.value) seleccionar(); });
+
+  function comprobarCorreo() {
+    var v = correo.value.trim().toLowerCase();
+    if (!v || !cfgActual) { enLista.textContent = ''; enLista.dataset.resultado = ''; return; }
+    if (tiene(cfgActual.equipo, v)) {
+      enLista.dataset.resultado = 'si';
+      enLista.textContent = '✅ Sí: ' + cfgActual.equipo[v].nombre + ' está en la lista.';
+    } else if (RE_CORREO.test(v)) {
+      enLista.dataset.resultado = 'no';
+      enLista.textContent = '❌ Ese correo no está en la lista. No instales: avisa a Uriel.';
+    } else {
+      enLista.textContent = ''; enLista.dataset.resultado = '';
+    }
+  }
+  correo.addEventListener('input', comprobarCorreo);
+
+  window.addEventListener('hashchange', arrancar);
+  arrancar();
+})();
+</script>
+</body>
+</html>
